@@ -1,0 +1,13 @@
+[package]
+name = "foliage"
+version = "0.1.0"
+authors = ["Patrick Lühne <patrick@luehne.de>"]
+description = "Abstract syntax tree for first-order logic with integer arithmetics"
+documentation = "https://github.com/potassco/foliage"
+homepage = "https://github.com/potassco/foliage"
+repository = "https://github.com/potassco/foliage"
+readme = "README.md"
+keywords = ["logic"]
+categories = ["data-structures", "science"]
+license = "MIT"
+edition = "2018"
