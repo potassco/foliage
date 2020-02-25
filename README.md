@@ -1,4 +1,4 @@
-# foliage [![GitHub release](https://img.shields.io/github/release/potassco/foliage.svg?maxAge=3600)](https://github.com/potassco/foliage/releases) [![crates.io](https://img.shields.io/crates/v/foliage.svg?maxAge=3600)](https://crates.io/crates/foliage)
+# foliage [![crates.io](https://img.shields.io/crates/v/foliage.svg?maxAge=3600)](https://crates.io/crates/foliage)
 
 > First-order logic with integer arithmetics in Rust
 
