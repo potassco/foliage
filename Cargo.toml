@@ -11,3 +11,10 @@ keywords = ["logic"]
 categories = ["data-structures", "science"]
 license = "MIT"
 edition = "2018"
+
+[dependencies]
+nom = {version = "5.1", optional = true}
+
+[features]
+default = ["parse"]
+parse = ["nom"]

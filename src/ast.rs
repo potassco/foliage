@@ -1,6 +1,6 @@
 // Operators
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum BinaryOperator
 {
 	Add,
@@ -11,7 +11,7 @@ pub enum BinaryOperator
 	Exponentiate,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ComparisonOperator
 {
 	Greater,
@@ -22,7 +22,7 @@ pub enum ComparisonOperator
 	Equal,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum UnaryOperator
 {
 	AbsoluteValue,
@@ -127,6 +127,17 @@ impl std::cmp::Ord for VariableDeclaration
 	}
 }
 
+impl std::hash::Hash for VariableDeclaration
+{
+	#[inline(always)]
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H)
+	{
+		let p = self as *const VariableDeclaration;
+
+		p.hash(state);
+	}
+}
+
 impl VariableDeclaration
 {
 	pub fn new(name: String) -> Self
@@ -142,6 +153,7 @@ pub type VariableDeclarations = Vec<std::rc::Rc<VariableDeclaration>>;
 
 // Terms
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct BinaryOperation
 {
 	pub operator: BinaryOperator,
@@ -162,6 +174,7 @@ impl BinaryOperation
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Function
 {
 	pub declaration: std::rc::Rc<FunctionDeclaration>,
@@ -183,13 +196,14 @@ impl Function
 	}
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SpecialInteger
 {
 	Infimum,
 	Supremum,
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UnaryOperation
 {
 	pub operator: UnaryOperator,
@@ -208,6 +222,7 @@ impl UnaryOperation
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Variable
 {
 	pub declaration: std::rc::Rc<VariableDeclaration>,
@@ -226,6 +241,7 @@ impl Variable
 
 // Formulas
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Compare
 {
 	pub operator: ComparisonOperator,
@@ -246,6 +262,7 @@ impl Compare
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct QuantifiedFormula
 {
 	pub parameters: std::rc::Rc<VariableDeclarations>,
@@ -264,6 +281,7 @@ impl QuantifiedFormula
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Implies
 {
 	pub direction: ImplicationDirection,
@@ -285,6 +303,7 @@ impl Implies
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Predicate
 {
 	pub declaration: std::rc::Rc<PredicateDeclaration>,
@@ -308,6 +327,7 @@ impl Predicate
 
 // Variants
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Term
 {
 	BinaryOperation(BinaryOperation),
@@ -425,6 +445,7 @@ impl Term
 	}
 }
 
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Formula
 {
 	And(Formulas),
