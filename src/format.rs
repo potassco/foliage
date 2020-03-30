@@ -15,6 +15,8 @@ impl Precedence for crate::Term
 			| Self::Integer(_)
 			| Self::String(_)
 			| Self::Variable(_)
+			| Self::UnaryOperation(
+				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, ..})
 				=> 0,
 			Self::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::Negative, ..})
@@ -33,9 +35,6 @@ impl Precedence for crate::Term
 			| Self::BinaryOperation(
 				crate::BinaryOperation{operator: crate::BinaryOperator::Subtract, ..})
 				=> 4,
-			Self::UnaryOperation(
-				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, ..})
-				=> 5,
 		}
 	}
 }
