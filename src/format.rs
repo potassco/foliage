@@ -160,7 +160,6 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 			Some(parent_precedence) => precedence > parent_precedence,
 			None => false,
 		};
-		let precedence = Some(precedence);
 
 		if requires_parentheses
 		{
@@ -201,36 +200,81 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 
 				Ok(())
 			},
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Add, left, right})
-				=> write!(format, "{:?} + {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Subtract, left, right})
-				=> write!(format, "{:?} - {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Multiply, left, right})
-				=> write!(format, "{:?} * {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Divide, left, right})
-				=> write!(format, "{:?} / {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Modulo, left, right})
-				=> write!(format, "{:?} % {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
-			crate::Term::BinaryOperation(
-				crate::BinaryOperation{operator: crate::BinaryOperator::Exponentiate, left, right})
-				=> write!(format, "{:?} ** {:?}", display_term(left, precedence),
-					display_term(right, precedence)),
+			crate::Term::BinaryOperation(binary_operation) =>
+			{
+				let operator_string = match binary_operation.operator
+				{
+					crate::BinaryOperator::Add => "+",
+					crate::BinaryOperator::Subtract => "-",
+					crate::BinaryOperator::Multiply => "*",
+					crate::BinaryOperator::Divide => "/",
+					crate::BinaryOperator::Modulo => "%",
+					crate::BinaryOperator::Exponentiate => "**",
+				};
+
+				let left_requires_parentheses = binary_operation.left.precedence() == precedence
+					// Exponentiation is right-associative and thus requires parentheses when
+					// nested on the left side
+					&& binary_operation.operator == crate::BinaryOperator::Exponentiate;
+
+				// The subtraction, division, and modulo operators require parentheses around the
+				// right argument even if it has the same precedence
+				let operator_requires_right_priority = match binary_operation.operator
+				{
+					crate::BinaryOperator::Subtract
+					| crate::BinaryOperator::Divide
+					| crate::BinaryOperator::Modulo
+						=> true,
+					_ => false,
+				};
+
+				// Additionally, modulo operations nested to the right of another multiplicative
+				// operation always require parentheses
+				let right_requires_priority = match *binary_operation.right
+				{
+					crate::Term::BinaryOperation(
+						crate::BinaryOperation{operator: crate::BinaryOperator::Modulo, ..})
+						=> true,
+					_ => false,
+				};
+
+				let right_requires_parentheses = binary_operation.right.precedence() == precedence
+					&& (operator_requires_right_priority || right_requires_priority);
+
+				if left_requires_parentheses
+				{
+					write!(format, "(")?;
+				}
+
+				write!(format, "{:?}", display_term(&binary_operation.left, Some(precedence)))?;
+
+				if left_requires_parentheses
+				{
+					write!(format, ")")?;
+				}
+
+				write!(format, " {} ", operator_string)?;
+
+				if right_requires_parentheses
+				{
+					write!(format, "(")?;
+				}
+
+				write!(format, "{:?}", display_term(&binary_operation.right, Some(precedence)))?;
+
+				if right_requires_parentheses
+				{
+					write!(format, ")")?;
+				}
+
+				Ok(())
+			},
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::Negative, argument})
-				=> write!(format, "-{:?}", display_term(argument, precedence)),
+				=> write!(format, "-{:?}", display_term(argument, Some(precedence))),
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, argument})
-				=> write!(format, "|{:?}|", display_term(argument, precedence)),
+				=> write!(format, "|{:?}|", display_term(argument, None)),
 		}?;
 
 		if requires_parentheses
