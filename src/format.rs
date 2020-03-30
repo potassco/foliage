@@ -185,7 +185,7 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 
 				if !function.arguments.is_empty()
 				{
-					write!(format, "{}(", function.declaration.name)?;
+					write!(format, "(")?;
 
 					let mut separator = "";
 
