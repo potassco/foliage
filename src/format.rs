@@ -67,6 +67,26 @@ impl Precedence for crate::Formula
 	}
 }
 
+impl std::fmt::Debug for crate::SpecialInteger
+{
+	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		match &self
+		{
+			Self::Infimum => write!(format, "#inf"),
+			Self::Supremum => write!(format, "#sup"),
+		}
+	}
+}
+
+impl std::fmt::Display for crate::SpecialInteger
+{
+	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		write!(format, "{:?}", &self)
+	}
+}
+
 impl std::fmt::Debug for crate::FunctionDeclaration
 {
 	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -151,8 +171,7 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 		{
 			crate::Term::Boolean(true) => write!(format, "true"),
 			crate::Term::Boolean(false) => write!(format, "false"),
-			crate::Term::SpecialInteger(crate::SpecialInteger::Infimum) => write!(format, "#inf"),
-			crate::Term::SpecialInteger(crate::SpecialInteger::Supremum) => write!(format, "#sup"),
+			crate::Term::SpecialInteger(value) => write!(format, "{:?}", value),
 			crate::Term::Integer(value) => write!(format, "{}", value),
 			crate::Term::String(value) => write!(format, "\"{}\"", value),
 			crate::Term::Variable(variable) => write!(format, "{:?}", variable.declaration),
