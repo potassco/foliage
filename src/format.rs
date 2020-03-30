@@ -183,7 +183,7 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 					"number of function arguments differs from declaration (expected {}, got {})",
 					function.declaration.arity, function.arguments.len());
 
-				if function.arguments.len() > 0
+				if !function.arguments.is_empty()
 				{
 					write!(format, "{}(", function.declaration.name)?;
 
