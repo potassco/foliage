@@ -1,5 +1,6 @@
 // Operators
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum BinaryOperator
 {
 	Add,
@@ -10,6 +11,7 @@ pub enum BinaryOperator
 	Exponentiate,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ComparisonOperator
 {
 	Greater,
@@ -20,6 +22,7 @@ pub enum ComparisonOperator
 	Equal,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum UnaryOperator
 {
 	AbsoluteValue,
@@ -171,6 +174,7 @@ impl Function
 	}
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum SpecialInteger
 {
 	Infimum,
