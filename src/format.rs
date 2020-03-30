@@ -121,8 +121,7 @@ struct TermDisplay<'term>
 	term: &'term crate::Term,
 }
 
-fn display_term<'term>(term: &'term crate::Term, parent_precedence: Option<i32>)
-	-> TermDisplay<'term>
+fn display_term(term: &crate::Term, parent_precedence: Option<i32>) -> TermDisplay
 {
 	TermDisplay
 	{
@@ -238,8 +237,7 @@ struct FormulaDisplay<'formula>
 	formula: &'formula crate::Formula,
 }
 
-fn display_formula<'formula>(formula: &'formula crate::Formula, parent_precedence: Option<i32>)
-	-> FormulaDisplay<'formula>
+fn display_formula(formula: &crate::Formula, parent_precedence: Option<i32>) -> FormulaDisplay
 {
 	FormulaDisplay
 	{
