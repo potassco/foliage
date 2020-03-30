@@ -376,8 +376,8 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				crate::Compare{operator: crate::ComparisonOperator::NotEqual, left, right})
 				=> write!(format, "{:?} != {:?}", display_term(left, None),
 					display_term(right, None))?,
-			crate::Formula::Boolean(true) => write!(format, "#true")?,
-			crate::Formula::Boolean(false) => write!(format, "#false")?,
+			crate::Formula::Boolean(true) => write!(format, "true")?,
+			crate::Formula::Boolean(false) => write!(format, "false")?,
 			crate::Formula::Predicate(predicate) =>
 			{
 				write!(format, "{}", predicate.declaration.name)?;
