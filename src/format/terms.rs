@@ -58,14 +58,19 @@ pub(crate) enum TermPosition
 	Right,
 }
 
-pub(crate) struct TermDisplay<'term>
+pub(crate) struct TermDisplay<'term, 'format, F>
+where
+	F: super::Format,
 {
 	term: &'term crate::Term,
 	parent_term: Option<&'term crate::Term>,
 	position: TermPosition,
+	format: &'format F,
 }
 
-impl<'term> TermDisplay<'term>
+impl<'term, 'format, F> TermDisplay<'term, 'format, F>
+where
+	F: super::Format,
 {
 	fn requires_parentheses(&self) -> bool
 	{
@@ -149,19 +154,24 @@ impl<'term> TermDisplay<'term>
 	}
 }
 
-pub(crate) fn display_term<'term>(term: &'term crate::Term, parent_term: Option<&'term crate::Term>,
-	position: TermPosition)
-	-> TermDisplay<'term>
+pub(crate) fn display_term<'term, 'format, F>(term: &'term crate::Term,
+	parent_term: Option<&'term crate::Term>, position: TermPosition, format: &'format F)
+	-> TermDisplay<'term, 'format, F>
+where
+	F: super::Format,
 {
 	TermDisplay
 	{
 		term,
 		parent_term,
 		position,
+		format,
 	}
 }
 
-impl<'term> std::fmt::Debug for TermDisplay<'term>
+impl<'term, 'format, F> std::fmt::Debug for TermDisplay<'term, 'format, F>
+where
+	F: super::Format,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -180,7 +190,8 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 			crate::Term::Integer(value) => write!(formatter, "{}", value)?,
 			crate::Term::String(value) => write!(formatter, "\"{}\"",
 				value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t"))?,
-			crate::Term::Variable(variable) => write!(formatter, "{:?}", variable.declaration)?,
+			crate::Term::Variable(variable) =>
+				self.format.display_variable_declaration(formatter, &variable.declaration)?,
 			crate::Term::Function(function) =>
 			{
 				write!(formatter, "{}", function.declaration.name)?;
@@ -198,7 +209,8 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 					for argument in &function.arguments
 					{
 						write!(formatter, "{}{:?}", separator,
-							display_term(&argument, Some(self.term), TermPosition::Any))?;
+							display_term(&argument, Some(self.term), TermPosition::Any,
+								self.format))?;
 
 						separator = ", ";
 					}
@@ -219,18 +231,20 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 				};
 
 				write!(formatter, "{:?} {} {:?}",
-					display_term(&binary_operation.left, Some(self.term), TermPosition::Left),
+					display_term(&binary_operation.left, Some(self.term), TermPosition::Left,
+						self.format),
 					operator_string,
-					display_term(&binary_operation.right, Some(self.term), TermPosition::Right))?;
+					display_term(&binary_operation.right, Some(self.term), TermPosition::Right,
+						self.format))?;
 			},
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::Negative, argument})
 				=> write!(formatter, "-{:?}",
-					display_term(argument, Some(self.term), TermPosition::Any))?,
+					display_term(argument, Some(self.term), TermPosition::Any, self.format))?,
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, argument})
 				=> write!(formatter, "|{:?}|",
-					display_term(argument, Some(self.term), TermPosition::Any))?,
+					display_term(argument, Some(self.term), TermPosition::Any, self.format))?,
 		}
 
 		if requires_parentheses
@@ -242,7 +256,9 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 	}
 }
 
-impl<'term> std::fmt::Display for TermDisplay<'term>
+impl<'term, 'format, F> std::fmt::Display for TermDisplay<'term, 'format, F>
+where
+	F: super::Format,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -254,7 +270,8 @@ impl std::fmt::Debug for crate::Term
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{:?}", display_term(&self, None, TermPosition::Any))
+		write!(formatter, "{:?}", display_term(&self, None, TermPosition::Any,
+			&super::DefaultFormat))
 	}
 }
 
@@ -262,7 +279,7 @@ impl std::fmt::Display for crate::Term
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{}", display_term(&self, None, TermPosition::Any))
+		write!(formatter, "{}", display_term(&self, None, TermPosition::Any, &super::DefaultFormat))
 	}
 }
 

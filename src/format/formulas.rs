@@ -35,14 +35,19 @@ enum FormulaPosition
 	ImpliesAntecedent,
 }
 
-struct FormulaDisplay<'formula>
+struct FormulaDisplay<'formula, 'format, F>
+where
+	F: super::Format,
 {
 	formula: &'formula crate::Formula,
 	parent_formula: Option<&'formula crate::Formula>,
 	position: FormulaPosition,
+	format: &'format F,
 }
 
-impl<'formula> FormulaDisplay<'formula>
+impl<'formula, 'format, F> FormulaDisplay<'formula, 'format, F>
+where
+	F: super::Format,
 {
 	fn requires_parentheses(&self) -> bool
 	{
@@ -112,19 +117,24 @@ impl<'formula> FormulaDisplay<'formula>
 	}
 }
 
-fn display_formula<'formula>(formula: &'formula crate::Formula,
-	parent_formula: Option<&'formula crate::Formula>, position: FormulaPosition)
-	-> FormulaDisplay<'formula>
+fn display_formula<'formula, 'format, F>(formula: &'formula crate::Formula,
+	parent_formula: Option<&'formula crate::Formula>, position: FormulaPosition, format: &'format F)
+	-> FormulaDisplay<'formula, 'format, F>
+where
+	F: super::Format,
 {
 	FormulaDisplay
 	{
 		formula,
 		parent_formula,
 		position,
+		format,
 	}
 }
 
-impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
+impl<'formula, 'format, F> std::fmt::Debug for FormulaDisplay<'formula, 'format, F>
+where
+	F: super::Format,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -142,7 +152,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				if exists.parameters.is_empty()
 				{
 					write!(formatter, "{:?}", display_formula(&exists.argument, self.parent_formula,
-						self.position))?;
+						self.position, self.format))?;
 				}
 				else
 				{
@@ -152,13 +162,14 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 
 					for parameter in exists.parameters.iter()
 					{
-						write!(formatter, "{}{:?}", separator, parameter)?;
+						write!(formatter, "{}", separator)?;
+						self.format.display_variable_declaration(formatter, &parameter)?;
 
 						separator = ", "
 					}
 
 					write!(formatter, " {:?}", display_formula(&exists.argument, Some(self.formula),
-						FormulaPosition::Any))?;
+						FormulaPosition::Any, self.format))?;
 				}
 			},
 			crate::Formula::ForAll(for_all) =>
@@ -166,7 +177,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				if for_all.parameters.is_empty()
 				{
 					write!(formatter, "{:?}", display_formula(&for_all.argument,
-						self.parent_formula, self.position))?;
+						self.parent_formula, self.position, self.format))?;
 				}
 				else
 				{
@@ -176,17 +187,18 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 
 					for parameter in for_all.parameters.iter()
 					{
-						write!(formatter, "{}{:?}", separator, parameter)?;
+						write!(formatter, "{}", separator)?;
+						self.format.display_variable_declaration(formatter, &parameter)?;
 
 						separator = ", "
 					}
 
 					write!(formatter, " {:?}", display_formula(&for_all.argument,
-						Some(self.formula), FormulaPosition::Any))?;
+						Some(self.formula), FormulaPosition::Any, self.format))?;
 				}
 			},
 			crate::Formula::Not(argument) => write!(formatter, "not {:?}",
-				display_formula(argument, Some(self.formula), FormulaPosition::Any))?,
+				display_formula(argument, Some(self.formula), FormulaPosition::Any, self.format))?,
 			crate::Formula::And(arguments) =>
 			{
 				if arguments.is_empty()
@@ -206,7 +218,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 					for argument in arguments
 					{
 						write!(formatter, "{}{:?}", separator,
-							display_formula(argument, parent_formula, position))?;
+							display_formula(argument, parent_formula, position, self.format))?;
 
 						separator = " and "
 					}
@@ -231,7 +243,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 					for argument in arguments
 					{
 						write!(formatter, "{}{:?}", separator,
-							display_formula(argument, parent_formula, position))?;
+							display_formula(argument, parent_formula, position, self.format))?;
 
 						separator = " or "
 					}
@@ -243,13 +255,14 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				{
 					write!(formatter, "{:?}",
 						display_formula(antecedent, Some(self.formula),
-							FormulaPosition::ImpliesAntecedent))
+							FormulaPosition::ImpliesAntecedent, self.format))
 				};
 
 				let format_implication = |formatter: &mut std::fmt::Formatter| -> Result<_, _>
 				{
 					write!(formatter, "{:?}",
-						display_formula(implication, Some(self.formula), FormulaPosition::Any))
+						display_formula(implication, Some(self.formula), FormulaPosition::Any,
+							self.format))
 				};
 
 				match direction
@@ -287,7 +300,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 					for argument in arguments
 					{
 						write!(formatter, "{}{:?}", separator,
-							display_formula(argument, parent_formula, position))?;
+							display_formula(argument, parent_formula, position, self.format))?;
 
 						separator = " <-> "
 					}
@@ -306,9 +319,9 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				};
 
 				write!(formatter, "{:?} {} {:?}",
-					display_term(&compare.left, None, TermPosition::Any),
+					display_term(&compare.left, None, TermPosition::Any, self.format),
 					operator_string,
-					display_term(&compare.right, None, TermPosition::Any))?;
+					display_term(&compare.right, None, TermPosition::Any, self.format))?;
 			},
 			crate::Formula::Boolean(true) => write!(formatter, "true")?,
 			crate::Formula::Boolean(false) => write!(formatter, "false")?,
@@ -325,7 +338,7 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 					for argument in &predicate.arguments
 					{
 						write!(formatter, "{}{:?}", separator, display_term(argument, None,
-							TermPosition::Any))?;
+							TermPosition::Any, self.format))?;
 
 						separator = ", "
 					}
@@ -344,7 +357,9 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 	}
 }
 
-impl<'formula> std::fmt::Display for FormulaDisplay<'formula>
+impl<'formula, 'format, F> std::fmt::Display for FormulaDisplay<'formula, 'format, F>
+where
+	F: super::Format,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -356,7 +371,8 @@ impl std::fmt::Debug for crate::Formula
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{:?}", display_formula(&self, None, FormulaPosition::Any))
+		write!(formatter, "{:?}", display_formula(&self, None, FormulaPosition::Any,
+			&super::DefaultFormat))
 	}
 }
 
@@ -364,7 +380,8 @@ impl std::fmt::Display for crate::Formula
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{}", display_formula(&self, None, FormulaPosition::Any))
+		write!(formatter, "{}", display_formula(&self, None, FormulaPosition::Any,
+			&super::DefaultFormat))
 	}
 }
 
