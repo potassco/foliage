@@ -1,52 +1,52 @@
 impl std::fmt::Debug for crate::SpecialInteger
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
 		match &self
 		{
-			Self::Infimum => write!(format, "#inf"),
-			Self::Supremum => write!(format, "#sup"),
+			Self::Infimum => write!(formatter, "#inf"),
+			Self::Supremum => write!(formatter, "#sup"),
 		}
 	}
 }
 
 impl std::fmt::Display for crate::SpecialInteger
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{:?}", &self)
+		write!(formatter, "{:?}", &self)
 	}
 }
 
 impl std::fmt::Debug for crate::FunctionDeclaration
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{}/{}", &self.name, self.arity)
+		write!(formatter, "{}/{}", &self.name, self.arity)
 	}
 }
 
 impl std::fmt::Display for crate::FunctionDeclaration
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{:?}", &self)
+		write!(formatter, "{:?}", &self)
 	}
 }
 
 impl std::fmt::Debug for crate::VariableDeclaration
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{}", &self.name)
+		write!(formatter, "{}", &self.name)
 	}
 }
 
 impl std::fmt::Display for crate::VariableDeclaration
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{:?}", &self)
+		write!(formatter, "{:?}", &self)
 	}
 }
 
@@ -163,27 +163,27 @@ pub(crate) fn display_term<'term>(term: &'term crate::Term, parent_term: Option<
 
 impl<'term> std::fmt::Debug for TermDisplay<'term>
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
 		let requires_parentheses = self.requires_parentheses();
 
 		if requires_parentheses
 		{
-			write!(format, "(")?;
+			write!(formatter, "(")?;
 		}
 
 		match &self.term
 		{
-			crate::Term::Boolean(true) => write!(format, "true")?,
-			crate::Term::Boolean(false) => write!(format, "false")?,
-			crate::Term::SpecialInteger(value) => write!(format, "{:?}", value)?,
-			crate::Term::Integer(value) => write!(format, "{}", value)?,
-			crate::Term::String(value) => write!(format, "\"{}\"",
+			crate::Term::Boolean(true) => write!(formatter, "true")?,
+			crate::Term::Boolean(false) => write!(formatter, "false")?,
+			crate::Term::SpecialInteger(value) => write!(formatter, "{:?}", value)?,
+			crate::Term::Integer(value) => write!(formatter, "{}", value)?,
+			crate::Term::String(value) => write!(formatter, "\"{}\"",
 				value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t"))?,
-			crate::Term::Variable(variable) => write!(format, "{:?}", variable.declaration)?,
+			crate::Term::Variable(variable) => write!(formatter, "{:?}", variable.declaration)?,
 			crate::Term::Function(function) =>
 			{
-				write!(format, "{}", function.declaration.name)?;
+				write!(formatter, "{}", function.declaration.name)?;
 
 				assert!(function.declaration.arity == function.arguments.len(),
 					"number of function arguments differs from declaration (expected {}, got {})",
@@ -191,19 +191,19 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 
 				if !function.arguments.is_empty()
 				{
-					write!(format, "(")?;
+					write!(formatter, "(")?;
 
 					let mut separator = "";
 
 					for argument in &function.arguments
 					{
-						write!(format, "{}{:?}", separator,
+						write!(formatter, "{}{:?}", separator,
 							display_term(&argument, Some(self.term), TermPosition::Any))?;
 
 						separator = ", ";
 					}
 
-					write!(format, ")")?;
+					write!(formatter, ")")?;
 				}
 			},
 			crate::Term::BinaryOperation(binary_operation) =>
@@ -218,24 +218,24 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 					crate::BinaryOperator::Exponentiate => "**",
 				};
 
-				write!(format, "{:?} {} {:?}",
+				write!(formatter, "{:?} {} {:?}",
 					display_term(&binary_operation.left, Some(self.term), TermPosition::Left),
 					operator_string,
 					display_term(&binary_operation.right, Some(self.term), TermPosition::Right))?;
 			},
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::Negative, argument})
-				=> write!(format, "-{:?}",
+				=> write!(formatter, "-{:?}",
 					display_term(argument, Some(self.term), TermPosition::Any))?,
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, argument})
-				=> write!(format, "|{:?}|",
+				=> write!(formatter, "|{:?}|",
 					display_term(argument, Some(self.term), TermPosition::Any))?,
 		}
 
 		if requires_parentheses
 		{
-			write!(format, ")")?;
+			write!(formatter, ")")?;
 		}
 
 		Ok(())
@@ -244,25 +244,25 @@ impl<'term> std::fmt::Debug for TermDisplay<'term>
 
 impl<'term> std::fmt::Display for TermDisplay<'term>
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{:?}", self)
+		write!(formatter, "{:?}", self)
 	}
 }
 
 impl std::fmt::Debug for crate::Term
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{:?}", display_term(&self, None, TermPosition::Any))
+		write!(formatter, "{:?}", display_term(&self, None, TermPosition::Any))
 	}
 }
 
 impl std::fmt::Display for crate::Term
 {
-	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(format, "{}", display_term(&self, None, TermPosition::Any))
+		write!(formatter, "{}", display_term(&self, None, TermPosition::Any))
 	}
 }
 
