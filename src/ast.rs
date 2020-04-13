@@ -170,14 +170,14 @@ pub struct Function
 
 impl Function
 {
-	pub fn new(declaration: &std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>) -> Self
+	pub fn new(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>) -> Self
 	{
 		assert_eq!(declaration.arity, arguments.len(),
 			"function has a different number of arguments then declared");
 
 		Self
 		{
-			declaration: std::rc::Rc::clone(declaration),
+			declaration,
 			arguments,
 		}
 	}
@@ -215,11 +215,11 @@ pub struct Variable
 
 impl Variable
 {
-	pub fn new(declaration: &std::rc::Rc<VariableDeclaration>) -> Self
+	pub fn new(declaration: std::rc::Rc<VariableDeclaration>) -> Self
 	{
 		Self
 		{
-			declaration: std::rc::Rc::clone(declaration),
+			declaration,
 		}
 	}
 }
@@ -293,14 +293,14 @@ pub struct Predicate
 
 impl Predicate
 {
-	pub fn new(declaration: &std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>) -> Self
+	pub fn new(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>) -> Self
 	{
 		assert_eq!(declaration.arity, arguments.len(),
 			"predicate has a different number of arguments then declared");
 
 		Self
 		{
-			declaration: std::rc::Rc::clone(declaration),
+			declaration,
 			arguments,
 		}
 	}
@@ -359,7 +359,7 @@ impl Term
 		Self::boolean(false)
 	}
 
-	pub fn function(declaration: &std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>)
+	pub fn function(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>)
 		-> Self
 	{
 		Self::Function(Function::new(declaration, arguments))
@@ -420,7 +420,7 @@ impl Term
 		Self::UnaryOperation(UnaryOperation::new(operator, argument))
 	}
 
-	pub fn variable(declaration: &std::rc::Rc<VariableDeclaration>) -> Self
+	pub fn variable(declaration: std::rc::Rc<VariableDeclaration>) -> Self
 	{
 		Self::Variable(Variable::new(declaration))
 	}
@@ -533,7 +533,7 @@ impl Formula
 		Self::Or(arguments)
 	}
 
-	pub fn predicate(declaration: &std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>)
+	pub fn predicate(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>)
 		-> Self
 	{
 		Self::Predicate(Predicate::new(declaration, arguments))
