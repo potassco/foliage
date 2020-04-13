@@ -29,6 +29,15 @@ pub enum UnaryOperator
 	Negative,
 }
 
+// ImplicationDirection
+
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum ImplicationDirection
+{
+	LeftToRight,
+	RightToLeft,
+}
+
 // Primitives
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -293,16 +302,19 @@ impl IfAndOnlyIf
 
 pub struct Implies
 {
+	pub direction: ImplicationDirection,
 	pub antecedent: Box<Formula>,
 	pub implication: Box<Formula>,
 }
 
 impl Implies
 {
-	pub fn new(antecedent: Box<Formula>, implication: Box<Formula>) -> Self
+	pub fn new(direction: ImplicationDirection, antecedent: Box<Formula>, implication: Box<Formula>)
+		-> Self
 	{
 		Self
 		{
+			direction,
 			antecedent,
 			implication,
 		}
@@ -524,9 +536,10 @@ impl Formula
 		Self::IfAndOnlyIf(IfAndOnlyIf::new(left, right))
 	}
 
-	pub fn implies(antecedent: Box<Formula>, consequent: Box<Formula>) -> Self
+	pub fn implies(direction: ImplicationDirection, antecedent: Box<Formula>,
+		consequent: Box<Formula>) -> Self
 	{
-		Self::Implies(Implies::new(antecedent, consequent))
+		Self::Implies(Implies::new(direction, antecedent, consequent))
 	}
 
 	pub fn less(left: Box<Term>, right: Box<Term>) -> Self

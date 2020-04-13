@@ -28,6 +28,18 @@ impl Precedence for crate::Formula
 	}
 }
 
+impl std::fmt::Debug for crate::ImplicationDirection
+{
+	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		match &self
+		{
+			Self::LeftToRight => write!(format, "left to right"),
+			Self::RightToLeft => write!(format, "right to left"),
+		}
+	}
+}
+
 impl std::fmt::Debug for crate::PredicateDeclaration
 {
 	fn fmt(&self, format: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -140,9 +152,14 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 					separator = " or "
 				}
 			},
-			crate::Formula::Implies(crate::Implies{antecedent, implication})
+			crate::Formula::Implies(crate::Implies{
+				direction: crate::ImplicationDirection::LeftToRight, antecedent, implication})
 				=> write!(format, "{:?} -> {:?}", display_formula(antecedent, precedence),
 					display_formula(implication, precedence))?,
+			crate::Formula::Implies(crate::Implies{
+				direction: crate::ImplicationDirection::RightToLeft, antecedent, implication})
+				=> write!(format, "{:?} <- {:?}", display_formula(implication, precedence),
+					display_formula(antecedent, precedence))?,
 			crate::Formula::IfAndOnlyIf(crate::IfAndOnlyIf{left, right})
 				=> write!(format, "{:?} <-> {:?}", display_formula(left, precedence),
 					display_formula(right, precedence))?,
