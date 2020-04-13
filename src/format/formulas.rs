@@ -160,9 +160,19 @@ impl<'formula> std::fmt::Debug for FormulaDisplay<'formula>
 				direction: crate::ImplicationDirection::RightToLeft, antecedent, implication})
 				=> write!(format, "{:?} <- {:?}", display_formula(implication, precedence),
 					display_formula(antecedent, precedence))?,
-			crate::Formula::IfAndOnlyIf(crate::IfAndOnlyIf{left, right})
-				=> write!(format, "{:?} <-> {:?}", display_formula(left, precedence),
-					display_formula(right, precedence))?,
+			crate::Formula::IfAndOnlyIf(arguments) =>
+			{
+				let mut separator = "";
+
+				assert!(!arguments.is_empty());
+
+				for argument in arguments
+				{
+					write!(format, "{}{:?}", separator, display_formula(argument, precedence))?;
+
+					separator = " <-> "
+				}
+			},
 			crate::Formula::Compare(
 				crate::Compare{operator: crate::ComparisonOperator::Less, left, right})
 				=> write!(format, "{:?} < {:?}", display_term(left, None),

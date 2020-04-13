@@ -282,24 +282,6 @@ impl ForAll
 	}
 }
 
-pub struct IfAndOnlyIf
-{
-	pub left: Box<Formula>,
-	pub right: Box<Formula>,
-}
-
-impl IfAndOnlyIf
-{
-	pub fn new(left: Box<Formula>, right: Box<Formula>) -> Self
-	{
-		Self
-		{
-			left,
-			right,
-		}
-	}
-}
-
 pub struct Implies
 {
 	pub direction: ImplicationDirection,
@@ -469,7 +451,7 @@ pub enum Formula
 	Compare(Compare),
 	Exists(Exists),
 	ForAll(ForAll),
-	IfAndOnlyIf(IfAndOnlyIf),
+	IfAndOnlyIf(Formulas),
 	Implies(Implies),
 	Not(Box<Formula>),
 	Or(Formulas),
@@ -531,9 +513,9 @@ impl Formula
 		Self::compare(ComparisonOperator::GreaterOrEqual, left, right)
 	}
 
-	pub fn if_and_only_if(left: Box<Formula>, right: Box<Formula>) -> Self
+	pub fn if_and_only_if(arguments: Formulas) -> Self
 	{
-		Self::IfAndOnlyIf(IfAndOnlyIf::new(left, right))
+		Self::IfAndOnlyIf(arguments)
 	}
 
 	pub fn implies(direction: ImplicationDirection, antecedent: Box<Formula>,
