@@ -246,31 +246,13 @@ impl Compare
 	}
 }
 
-pub struct Exists
+pub struct QuantifiedFormula
 {
 	pub parameters: std::rc::Rc<VariableDeclarations>,
 	pub argument: Box<Formula>,
 }
 
-impl Exists
-{
-	pub fn new(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
-	{
-		Self
-		{
-			parameters,
-			argument,
-		}
-	}
-}
-
-pub struct ForAll
-{
-	pub parameters: std::rc::Rc<VariableDeclarations>,
-	pub argument: Box<Formula>,
-}
-
-impl ForAll
+impl QuantifiedFormula
 {
 	pub fn new(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
 	{
@@ -449,8 +431,8 @@ pub enum Formula
 	And(Formulas),
 	Boolean(bool),
 	Compare(Compare),
-	Exists(Exists),
-	ForAll(ForAll),
+	Exists(QuantifiedFormula),
+	ForAll(QuantifiedFormula),
 	IfAndOnlyIf(Formulas),
 	Implies(Implies),
 	Not(Box<Formula>),
@@ -483,7 +465,7 @@ impl Formula
 	{
 		assert!(!parameters.is_empty());
 
-		Self::Exists(Exists::new(parameters, argument))
+		Self::Exists(QuantifiedFormula::new(parameters, argument))
 	}
 
 	pub fn equal(left: Box<Term>, right: Box<Term>) -> Self
@@ -500,7 +482,7 @@ impl Formula
 	{
 		assert!(!parameters.is_empty());
 
-		Self::ForAll(ForAll::new(parameters, argument))
+		Self::ForAll(QuantifiedFormula::new(parameters, argument))
 	}
 
 	pub fn greater(left: Box<Term>, right: Box<Term>) -> Self
