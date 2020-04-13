@@ -165,12 +165,12 @@ impl BinaryOperation
 pub struct Function
 {
 	pub declaration: std::rc::Rc<FunctionDeclaration>,
-	pub arguments: Vec<Box<Term>>,
+	pub arguments: Terms,
 }
 
 impl Function
 {
-	pub fn new(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>) -> Self
+	pub fn new(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Terms) -> Self
 	{
 		assert_eq!(declaration.arity, arguments.len(),
 			"function has a different number of arguments then declared");
@@ -288,12 +288,12 @@ impl Implies
 pub struct Predicate
 {
 	pub declaration: std::rc::Rc<PredicateDeclaration>,
-	pub arguments: Vec<Box<Term>>,
+	pub arguments: Terms,
 }
 
 impl Predicate
 {
-	pub fn new(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>) -> Self
+	pub fn new(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Terms) -> Self
 	{
 		assert_eq!(declaration.arity, arguments.len(),
 			"predicate has a different number of arguments then declared");
@@ -320,7 +320,7 @@ pub enum Term
 	Variable(Variable),
 }
 
-pub type Terms = Vec<Box<Term>>;
+pub type Terms = Vec<Term>;
 
 impl Term
 {
@@ -359,8 +359,7 @@ impl Term
 		Self::boolean(false)
 	}
 
-	pub fn function(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Vec<Box<Term>>)
-		-> Self
+	pub fn function(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Terms) -> Self
 	{
 		Self::Function(Function::new(declaration, arguments))
 	}
@@ -440,7 +439,7 @@ pub enum Formula
 	Predicate(Predicate),
 }
 
-pub type Formulas = Vec<Box<Formula>>;
+pub type Formulas = Vec<Formula>;
 
 impl Formula
 {
@@ -533,8 +532,7 @@ impl Formula
 		Self::Or(arguments)
 	}
 
-	pub fn predicate(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Vec<Box<Term>>)
-		-> Self
+	pub fn predicate(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Terms) -> Self
 	{
 		Self::Predicate(Predicate::new(declaration, arguments))
 	}
