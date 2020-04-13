@@ -445,8 +445,6 @@ impl Formula
 {
 	pub fn and(arguments: Formulas) -> Self
 	{
-		assert!(!arguments.is_empty());
-
 		Self::And(arguments)
 	}
 
@@ -462,8 +460,6 @@ impl Formula
 
 	pub fn exists(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
 	{
-		assert!(!parameters.is_empty());
-
 		Self::Exists(QuantifiedFormula::new(parameters, argument))
 	}
 
@@ -479,8 +475,6 @@ impl Formula
 
 	pub fn for_all(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
 	{
-		assert!(!parameters.is_empty());
-
 		Self::ForAll(QuantifiedFormula::new(parameters, argument))
 	}
 
@@ -527,8 +521,6 @@ impl Formula
 
 	pub fn or(arguments: Formulas) -> Self
 	{
-		assert!(!arguments.is_empty());
-
 		Self::Or(arguments)
 	}
 
