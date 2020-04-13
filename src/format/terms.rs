@@ -58,7 +58,7 @@ pub(crate) enum TermPosition
 	Right,
 }
 
-pub(crate) struct TermDisplay<'term, 'format, F>
+pub struct TermDisplay<'term, 'format, F>
 where
 	F: super::Format,
 {

@@ -29,13 +29,13 @@ impl std::fmt::Display for crate::PredicateDeclaration
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-enum FormulaPosition
+pub(crate) enum FormulaPosition
 {
 	Any,
 	ImpliesAntecedent,
 }
 
-struct FormulaDisplay<'formula, 'format, F>
+pub struct FormulaDisplay<'formula, 'format, F>
 where
 	F: super::Format,
 {
@@ -117,7 +117,7 @@ where
 	}
 }
 
-fn display_formula<'formula, 'format, F>(formula: &'formula crate::Formula,
+pub(crate) fn display_formula<'formula, 'format, F>(formula: &'formula crate::Formula,
 	parent_formula: Option<&'formula crate::Formula>, position: FormulaPosition, format: &'format F)
 	-> FormulaDisplay<'formula, 'format, F>
 where

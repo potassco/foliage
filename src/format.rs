@@ -1,5 +1,5 @@
-mod formulas;
-mod terms;
+pub mod formulas;
+pub mod terms;
 
 pub trait Format
 {
@@ -18,4 +18,20 @@ impl Format for DefaultFormat
 	{
 		write!(formatter, "{:?}", variable_declaration)
 	}
+}
+
+pub fn display_term<'term, 'format, F>(term: &'term crate::Term, format: &'format F)
+	-> terms::TermDisplay<'term, 'format, F>
+where
+	F: Format,
+{
+	terms::display_term(term, None, terms::TermPosition::Any, format)
+}
+
+pub fn display_formula<'formula, 'format, F>(formula: &'formula crate::Formula, format: &'format F)
+	-> formulas::FormulaDisplay<'formula, 'format, F>
+where
+	F: Format,
+{
+	formulas::display_formula(formula, None, formulas::FormulaPosition::Any, format)
 }
