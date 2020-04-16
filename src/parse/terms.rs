@@ -94,7 +94,7 @@ pub(crate) fn function_or_predicate<'i>(i: &'i str, d: &Declarations)
 	)(i)
 }
 
-pub fn function<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Function>
+fn function<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Function>
 {
 	map
 	(
@@ -133,7 +133,7 @@ pub fn function<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Fun
 	)(i)
 }
 
-pub fn variable_declaration(i: &str) -> IResult<&str, crate::VariableDeclaration>
+pub(crate) fn variable_declaration(i: &str) -> IResult<&str, crate::VariableDeclaration>
 {
 	map
 	(
@@ -142,7 +142,7 @@ pub fn variable_declaration(i: &str) -> IResult<&str, crate::VariableDeclaration
 	)(i)
 }
 
-pub fn variable<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Variable>
+fn variable<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Variable>
 {
 	map
 	(
@@ -801,7 +801,8 @@ mod tests
 		assert_ne!(x1.declaration, y1.declaration);
 		assert_ne!(x2.declaration, y1.declaration);
 
-		declarations.variable_declaration_stack.borrow_mut().push(layer_1);
+		let _guard
+			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_1);
 
 		let x3 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -816,7 +817,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_eq!(y1.declaration, y2.declaration);
 
-		declarations.variable_declaration_stack.borrow_mut().push(layer_2);
+		let _guard
+			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_2);
 
 		let x5 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -829,7 +831,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_eq!(a1.declaration, a2.declaration);
 
-		declarations.variable_declaration_stack.borrow_mut().push(layer_3);
+		let _guard
+			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_3);
 
 		let x7 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -838,7 +841,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_ne!(y2.declaration, y3.declaration);
 
-		declarations.variable_declaration_stack.borrow_mut().push(layer_4);
+		let _guard
+			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_4);
 
 		let x8 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);

@@ -259,13 +259,10 @@ fn quantified_formula<'a, 'b>(i: &'a str, d: &Declarations, keyword: &'b str)
 					return Err(nom::Err::Failure((i, nom::error::ErrorKind::Many1)));
 				}
 
-				d.variable_declaration_stack.borrow_mut().push(std::rc::Rc::clone(&variable_declarations));
+				let _guard = crate::VariableDeclarationStack::push(&d.variable_declaration_stack,
+					std::rc::Rc::clone(&variable_declarations));
 
 				let (i, argument) = formula_precedence_0(i, d)?;
-
-				// TODO: report logic errors more appropriately
-				d.variable_declaration_stack.borrow_mut().pop()
-					.map_err(|_| nom::Err::Failure((i, nom::error::ErrorKind::Verify)))?;
 
 				Ok((i, crate::QuantifiedFormula::new(variable_declarations, Box::new(argument))))
 			}

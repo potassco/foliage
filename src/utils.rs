@@ -1,3 +1,20 @@
+pub trait FindFunctionDeclaration
+{
+	fn find_function_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<crate::FunctionDeclaration>;
+}
+
+pub trait FindPredicateDeclaration
+{
+	fn find_predicate_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<crate::PredicateDeclaration>;
+}
+
+pub trait FindVariableDeclaration
+{
+	fn find_variable_declaration(&self, name: &str) -> std::rc::Rc<crate::VariableDeclaration>;
+}
+
 pub struct VariableDeclarationStack
 {
 	pub free_variable_declarations: crate::VariableDeclarations,
@@ -59,14 +76,37 @@ impl VariableDeclarationStack
 			&& self.bound_variable_declaration_stack.is_empty()
 	}
 
-	pub fn push(&mut self, bound_variable_declarations: std::rc::Rc<crate::VariableDeclarations>)
+	pub fn push<'v>(variable_declaration_stack: &'v std::cell::RefCell<VariableDeclarationStack>,
+		bound_variable_declarations: std::rc::Rc<crate::VariableDeclarations>)
+		-> VariableDeclarationStackGuard
 	{
-		self.bound_variable_declaration_stack.push(bound_variable_declarations);
+		variable_declaration_stack.borrow_mut()
+			.bound_variable_declaration_stack.push(bound_variable_declarations);
+
+		VariableDeclarationStackGuard
+		{
+			variable_declaration_stack: variable_declaration_stack,
+		}
 	}
 
-	pub fn pop(&mut self) -> Result<(), crate::Error>
+	pub(self) fn pop(&mut self)
 	{
-		self.bound_variable_declaration_stack.pop().map(|_| ())
-			.ok_or_else(|| crate::Error::new_logic("variable stack not in expected state"))
+		if let None = self.bound_variable_declaration_stack.pop()
+		{
+			unreachable!()
+		}
+	}
+}
+
+pub struct VariableDeclarationStackGuard<'v>
+{
+	variable_declaration_stack: &'v std::cell::RefCell<VariableDeclarationStack>,
+}
+
+impl<'v> Drop for VariableDeclarationStackGuard<'v>
+{
+	fn drop(&mut self)
+	{
+		self.variable_declaration_stack.borrow_mut().pop();
 	}
 }
