@@ -118,7 +118,19 @@ impl<'p> VariableDeclarationStackLayer<'p>
 		}
 	}
 
-	#[cfg(test)]
+	pub fn free_variable_declarations_do_mut<F, G>(&self, f: F) -> G
+	where
+		F: Fn(&mut crate::VariableDeclarations) -> G
+	{
+		match self
+		{
+			VariableDeclarationStackLayer::Free(free_variable_declarations)
+				=> f(&mut free_variable_declarations.borrow_mut()),
+			VariableDeclarationStackLayer::Bound(bound_variable_declarations)
+				=> bound_variable_declarations.parent.free_variable_declarations_do_mut(f),
+		}
+	}
+
 	pub fn free_variable_declarations_do<F, G>(&self, f: F) -> G
 	where
 		F: Fn(&crate::VariableDeclarations) -> G
