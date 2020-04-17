@@ -15,98 +15,133 @@ pub trait FindVariableDeclaration
 	fn find_variable_declaration(&self, name: &str) -> std::rc::Rc<crate::VariableDeclaration>;
 }
 
-pub struct VariableDeclarationStack
+pub struct FreeVariableDeclarations
 {
-	pub free_variable_declarations: crate::VariableDeclarations,
-	bound_variable_declaration_stack: Vec<std::rc::Rc<crate::VariableDeclarations>>,
+	variable_declarations: std::cell::RefCell<crate::VariableDeclarations>,
 }
 
-impl VariableDeclarationStack
+impl FreeVariableDeclarations
 {
 	pub fn new() -> Self
 	{
 		Self
 		{
-			free_variable_declarations: crate::VariableDeclarations::new(),
-			bound_variable_declaration_stack: vec![],
+			variable_declarations: std::cell::RefCell::new(vec![]),
 		}
+	}
+}
+
+pub struct BoundVariableDeclarations<'p>
+{
+	parent: &'p VariableDeclarationStackLayer<'p>,
+	variable_declarations: std::rc::Rc<crate::VariableDeclarations>,
+}
+
+impl<'p> BoundVariableDeclarations<'p>
+{
+	pub fn new(parent: &'p VariableDeclarationStackLayer<'p>,
+		variable_declarations: std::rc::Rc<crate::VariableDeclarations>) -> Self
+	{
+		Self
+		{
+			parent,
+			variable_declarations,
+		}
+	}
+}
+
+pub enum VariableDeclarationStackLayer<'p>
+{
+	Free(FreeVariableDeclarations),
+	Bound(BoundVariableDeclarations<'p>),
+}
+
+impl<'p> VariableDeclarationStackLayer<'p>
+{
+	pub fn free() -> Self
+	{
+		Self::Free(FreeVariableDeclarations::new())
+	}
+
+	pub fn bound(parent: &'p VariableDeclarationStackLayer<'p>,
+		variable_declarations: std::rc::Rc<crate::VariableDeclarations>) -> Self
+	{
+		Self::Bound(BoundVariableDeclarations::new(parent, variable_declarations))
 	}
 
 	pub fn find(&self, variable_name: &str) -> Option<std::rc::Rc<crate::VariableDeclaration>>
 	{
-		for variable_declarations in self.bound_variable_declaration_stack.iter().rev()
+		match self
 		{
-			if let Some(variable_declaration) = variable_declarations.iter()
-				.find(|x| x.name == variable_name)
+			VariableDeclarationStackLayer::Free(free) =>
 			{
-				return Some(std::rc::Rc::clone(&variable_declaration));
-			}
-		}
+				if let Some(variable_declaration) = free.variable_declarations.borrow().iter()
+					.find(|x| x.name == variable_name)
+				{
+					return Some(std::rc::Rc::clone(&variable_declaration));
+				}
 
-		if let Some(variable_declaration) = self.free_variable_declarations.iter()
-			.find(|x| x.name == variable_name)
-		{
-			return Some(std::rc::Rc::clone(&variable_declaration));
-		}
+				None
+			},
+			VariableDeclarationStackLayer::Bound(bound) =>
+			{
+				if let Some(variable_declaration) = bound.variable_declarations.iter()
+					.find(|x| x.name == variable_name)
+				{
+					return Some(std::rc::Rc::clone(&variable_declaration));
+				}
 
-		None
-	}
-
-	pub fn find_or_create(&mut self, variable_name: &str) -> std::rc::Rc<crate::VariableDeclaration>
-	{
-		if let Some(variable_declaration) = self.find(variable_name)
-		{
-			return variable_declaration;
-		}
-
-		let variable_declaration = crate::VariableDeclaration
-		{
-			name: variable_name.to_owned(),
-		};
-		let variable_declaration = std::rc::Rc::new(variable_declaration);
-
-		self.free_variable_declarations.push(std::rc::Rc::clone(&variable_declaration));
-
-		variable_declaration
-	}
-
-	pub fn is_empty(&self) -> bool
-	{
-		self.free_variable_declarations.is_empty()
-			&& self.bound_variable_declaration_stack.is_empty()
-	}
-
-	pub fn push<'v>(variable_declaration_stack: &'v std::cell::RefCell<VariableDeclarationStack>,
-		bound_variable_declarations: std::rc::Rc<crate::VariableDeclarations>)
-		-> VariableDeclarationStackGuard
-	{
-		variable_declaration_stack.borrow_mut()
-			.bound_variable_declaration_stack.push(bound_variable_declarations);
-
-		VariableDeclarationStackGuard
-		{
-			variable_declaration_stack: variable_declaration_stack,
+				bound.parent.find(variable_name)
+			},
 		}
 	}
 
-	pub(self) fn pop(&mut self)
+	pub fn find_or_create(&self, variable_name: &str) -> std::rc::Rc<crate::VariableDeclaration>
 	{
-		if let None = self.bound_variable_declaration_stack.pop()
+		match self
 		{
-			unreachable!()
+			VariableDeclarationStackLayer::Free(free) =>
+			{
+				if let Some(variable_declaration) = free.variable_declarations.borrow().iter()
+					.find(|x| x.name == variable_name)
+				{
+					return std::rc::Rc::clone(&variable_declaration);
+				}
+
+				let variable_declaration = crate::VariableDeclaration
+				{
+					name: variable_name.to_owned(),
+				};
+				let variable_declaration = std::rc::Rc::new(variable_declaration);
+
+				free.variable_declarations.borrow_mut()
+					.push(std::rc::Rc::clone(&variable_declaration));
+
+				variable_declaration
+			},
+			VariableDeclarationStackLayer::Bound(bound) =>
+			{
+				if let Some(variable_declaration) = bound.variable_declarations.iter()
+					.find(|x| x.name == variable_name)
+				{
+					return std::rc::Rc::clone(&variable_declaration);
+				}
+
+				bound.parent.find_or_create(variable_name)
+			},
 		}
 	}
-}
 
-pub struct VariableDeclarationStackGuard<'v>
-{
-	variable_declaration_stack: &'v std::cell::RefCell<VariableDeclarationStack>,
-}
-
-impl<'v> Drop for VariableDeclarationStackGuard<'v>
-{
-	fn drop(&mut self)
+	#[cfg(test)]
+	pub fn free_variable_declarations_do<F, G>(&self, f: F) -> G
+	where
+		F: Fn(&crate::VariableDeclarations) -> G
 	{
-		self.variable_declaration_stack.borrow_mut().pop();
+		match self
+		{
+			VariableDeclarationStackLayer::Free(free) => f(&free.variable_declarations.borrow()),
+			VariableDeclarationStackLayer::Bound(bound)
+				=> bound.parent.free_variable_declarations_do(f),
+		}
 	}
 }

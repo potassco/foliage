@@ -11,11 +11,12 @@ use nom::
 
 use super::{Declarations, boolean, word_boundary};
 
-pub fn predicate<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Predicate>
+pub fn predicate<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Predicate>
 {
 	map
 	(
-		|i| crate::parse::terms::function_or_predicate(i, d),
+		|i| crate::parse::terms::function_or_predicate(i, d, v),
 		|(name, arguments)|
 		{
 			let arguments = match arguments
@@ -50,7 +51,8 @@ pub fn predicate<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Pr
 	)(i)
 }
 
-fn not<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn not<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	map
 	(
@@ -61,13 +63,14 @@ fn not<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
 				tag("not"),
 				multispace0,
 			),
-			|i| formula_precedence_2(i, d),
+			|i| formula_precedence_2(i, d, v),
 		),
 		|x| crate::Formula::not(Box::new(x)),
 	)(i)
 }
 
-fn and<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
+fn and<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formulas>
 {
 	map_res
 	(
@@ -83,7 +86,7 @@ fn and<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
 				),
 				multispace0,
 			),
-			|i| formula_precedence_2(i, d),
+			|i| formula_precedence_2(i, d, v),
 		),
 		|arguments| -> Result<_, (_, _)>
 		{
@@ -99,7 +102,8 @@ fn and<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
 	)(i)
 }
 
-fn or<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
+fn or<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formulas>
 {
 	map_res
 	(
@@ -115,7 +119,7 @@ fn or<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
 				),
 				multispace0,
 			),
-			|i| formula_precedence_3(i, d),
+			|i| formula_precedence_3(i, d, v),
 		),
 		|arguments| -> Result<_, (_, _)>
 		{
@@ -131,7 +135,9 @@ fn or<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
 	)(i)
 }
 
-fn implies_left_to_right<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn implies_left_to_right<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	map
 	(
@@ -141,7 +147,7 @@ fn implies_left_to_right<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 			(
 				terminated
 				(
-					|i| formula_precedence_4(i, d),
+					|i| formula_precedence_4(i, d, v),
 					delimited
 					(
 						multispace0,
@@ -150,7 +156,7 @@ fn implies_left_to_right<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 					),
 				)
 			),
-			|i| formula_precedence_4(i, d),
+			|i| formula_precedence_4(i, d, v),
 		),
 		|(arguments, last_argument)| arguments.into_iter().rev().fold(last_argument,
 			|accumulator, argument|
@@ -159,13 +165,15 @@ fn implies_left_to_right<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 	)(i)
 }
 
-fn implies_right_to_left<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn implies_right_to_left<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	map
 	(
 		pair
 		(
-			|i| formula_precedence_4(i, d),
+			|i| formula_precedence_4(i, d, v),
 			many1
 			(
 				preceded
@@ -176,7 +184,7 @@ fn implies_right_to_left<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 						tag("<-"),
 						multispace0,
 					),
-					|i| formula_precedence_4(i, d),
+					|i| formula_precedence_4(i, d, v),
 				)
 			),
 		),
@@ -187,7 +195,8 @@ fn implies_right_to_left<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 	)(i)
 }
 
-fn if_and_only_if<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formulas>
+fn if_and_only_if<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formulas>
 {
 	map_res
 	(
@@ -199,7 +208,7 @@ fn if_and_only_if<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::F
 				tag("<->"),
 				multispace0,
 			),
-			|i| formula_precedence_5(i, d),
+			|i| formula_precedence_5(i, d, v),
 		),
 		|arguments| -> Result<_, (_, _)>
 		{
@@ -215,8 +224,9 @@ fn if_and_only_if<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::F
 	)(i)
 }
 
-fn quantified_formula<'a, 'b>(i: &'a str, d: &Declarations, keyword: &'b str)
-	-> IResult<&'a str, crate::QuantifiedFormula>
+fn quantified_formula<'i, 'b, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer, keyword: &'b str)
+	-> IResult<&'i str, crate::QuantifiedFormula>
 {
 	preceded
 	(
@@ -259,10 +269,11 @@ fn quantified_formula<'a, 'b>(i: &'a str, d: &Declarations, keyword: &'b str)
 					return Err(nom::Err::Failure((i, nom::error::ErrorKind::Many1)));
 				}
 
-				let _guard = crate::VariableDeclarationStack::push(&d.variable_declaration_stack,
-					std::rc::Rc::clone(&variable_declarations));
+				let v2 = crate::VariableDeclarationStackLayer::Bound(
+					crate::BoundVariableDeclarations::new(v,
+						std::rc::Rc::clone(&variable_declarations)));
 
-				let (i, argument) = formula_precedence_0(i, d)?;
+				let (i, argument) = formula_precedence_0(i, d, &v2)?;
 
 				Ok((i, crate::QuantifiedFormula::new(variable_declarations, Box::new(argument))))
 			}
@@ -270,13 +281,14 @@ fn quantified_formula<'a, 'b>(i: &'a str, d: &Declarations, keyword: &'b str)
 	)(i)
 }
 
-fn compare<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Compare>
+fn compare<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Compare>
 {
 	map
 	(
 		tuple
 		((
-			|i| crate::parse::term(i, d),
+			|i| crate::parse::term(i, d, v),
 			delimited
 			(
 				multispace0,
@@ -315,7 +327,7 @@ fn compare<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Compare>
 				)),
 				multispace0,
 			),
-			|i| crate::parse::term(i, d),
+			|i| crate::parse::term(i, d, v),
 		)),
 		|(left, operator, right)|
 		{
@@ -324,17 +336,21 @@ fn compare<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Compare>
 	)(i)
 }
 
-fn exists<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::QuantifiedFormula>
+fn exists<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::QuantifiedFormula>
 {
-	quantified_formula(i, d, "exists")
+	quantified_formula(i, d, v, "exists")
 }
 
-fn for_all<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::QuantifiedFormula>
+fn for_all<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::QuantifiedFormula>
 {
-	quantified_formula(i, d, "forall")
+	quantified_formula(i, d, v, "forall")
 }
 
-fn formula_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	delimited
 	(
@@ -343,7 +359,7 @@ fn formula_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 			tag("("),
 			multispace0,
 		),
-		|i| formula(i, d),
+		|i| formula(i, d, v),
 		preceded
 		(
 			multispace0,
@@ -352,7 +368,9 @@ fn formula_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, c
 	)(i)
 }
 
-fn formula_precedence_0<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
@@ -363,97 +381,110 @@ fn formula_precedence_0<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, cr
 		),
 		map
 		(
-			|i| predicate(i, d),
+			|i| predicate(i, d, v),
 			crate::Formula::Predicate,
 		),
 		map
 		(
-			|i| compare(i, d),
+			|i| compare(i, d, v),
 			crate::Formula::Compare,
 		),
-		|i| formula_parenthesized(i, d),
+		|i| formula_parenthesized(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_1<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
 		map
 		(
-			|i| exists(i, d),
+			|i| exists(i, d, v),
 			crate::Formula::Exists,
 		),
 		map
 		(
-			|i| for_all(i, d),
+			|i| for_all(i, d, v),
 			crate::Formula::ForAll,
 		),
-		|i| formula_precedence_0(i, d),
+		|i| formula_precedence_0(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_2<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
-		|i| not(i, d),
-		|i| formula_precedence_1(i, d),
+		|i| not(i, d, v),
+		|i| formula_precedence_1(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_3<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
 		map
 		(
-			|i| and(i, d),
+			|i| and(i, d, v),
 			crate::Formula::And,
 		),
-		|i| formula_precedence_2(i, d),
+		|i| formula_precedence_2(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_4<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
 		map
 		(
-			|i| or(i, d),
+			|i| or(i, d, v),
 			crate::Formula::Or,
 		),
-		|i| formula_precedence_3(i, d),
+		|i| formula_precedence_3(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_5<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_5<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
-		|i| implies_left_to_right(i, d),
-		|i| implies_right_to_left(i, d),
-		|i| formula_precedence_4(i, d),
+		|i| implies_left_to_right(i, d, v),
+		|i| implies_right_to_left(i, d, v),
+		|i| formula_precedence_4(i, d, v),
 	))(i)
 }
 
-fn formula_precedence_6<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+fn formula_precedence_6<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
 	alt
 	((
 		map
 		(
-			|i| if_and_only_if(i, d),
+			|i| if_and_only_if(i, d, v),
 			crate::Formula::IfAndOnlyIf,
 		),
-		|i| formula_precedence_5(i, d),
+		|i| formula_precedence_5(i, d, v),
 	))(i)
 }
 
-pub fn formula<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Formula>
+pub fn formula<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Formula>
 {
-	formula_precedence_6(i, d)
+	formula_precedence_6(i, d, v)
 }
 
 #[cfg(test)]
@@ -461,16 +492,18 @@ mod tests
 {
 	use crate::parse::formulas::*;
 	use crate::parse::formulas as original;
-	use crate::{Formula, Term};
+	use crate::{Formula, ImplicationDirection, Term, VariableDeclarationStackLayer};
 
 	fn formula(i: &str) -> Formula
 	{
-		original::formula(i, &Declarations::new()).unwrap().1
+		original::formula(i, &Declarations::new(), &VariableDeclarationStackLayer::free())
+			.unwrap().1
 	}
 
 	fn formula_remainder(i: &str) -> &str
 	{
-		original::formula(i, &Declarations::new()).unwrap().0
+		original::formula(i, &Declarations::new(), &VariableDeclarationStackLayer::free())
+			.unwrap().0
 	}
 
 	fn format_formula(i: &str) -> String
@@ -542,7 +575,8 @@ mod tests
 		assert_eq!(
 			as_predicate(formula_as_and("(p and q and r and s)").remove(3)).declaration.name, "s");
 
-		let formula = |i| original::formula(i, &Declarations::new());
+		let formula = |i| original::formula(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free());
 
 		// Malformed formulas shouldn’t be accepted
 		assert!(formula("and").is_err());
@@ -582,7 +616,8 @@ mod tests
 		assert_eq!(
 			as_predicate(formula_as_or("(p or q or r or s)").remove(3)).declaration.name, "s");
 
-		let formula = |i| original::formula(i, &Declarations::new());
+		let formula = |i| original::formula(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free());
 
 		// Malformed formulas shouldn’t be accepted
 		assert!(formula("or").is_err());
@@ -612,13 +647,11 @@ mod tests
 
 		assert_eq!(as_predicate(*formula_as_implies("a -> b").antecedent).declaration.name, "a");
 		assert_eq!(as_predicate(*formula_as_implies("a -> b").implication).declaration.name, "b");
-		assert_eq!(formula_as_implies("a -> b").direction,
-			crate::ImplicationDirection::LeftToRight);
+		assert_eq!(formula_as_implies("a -> b").direction, ImplicationDirection::LeftToRight);
 
 		assert_eq!(as_predicate(*formula_as_implies("a <- b").antecedent).declaration.name, "b");
 		assert_eq!(as_predicate(*formula_as_implies("a <- b").implication).declaration.name, "a");
-		assert_eq!(formula_as_implies("a <- b").direction,
-			crate::ImplicationDirection::RightToLeft);
+		assert_eq!(formula_as_implies("a <- b").direction, ImplicationDirection::RightToLeft);
 
 		assert_eq!(format_formula("(a -> b -> c)"), "a -> b -> c");
 		assert_eq!(format_formula("(a -> (b -> c))"), "a -> b -> c");
@@ -628,8 +661,10 @@ mod tests
 	#[test]
 	fn parse_predicate()
 	{
-		let predicate = |i| original::predicate(i, &Declarations::new()).unwrap().1;
-		let predicate_remainder = |i| original::predicate(i, &Declarations::new()).unwrap().0;
+		let predicate = |i| original::predicate(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free()).unwrap().1;
+		let predicate_remainder = |i| original::predicate(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free()).unwrap().0;
 
 		assert_eq!(predicate("s").declaration.name, "s");
 		assert_eq!(predicate("s").declaration.arity, 0);
@@ -655,20 +690,23 @@ mod tests
 	#[test]
 	fn parse_exists_primitive()
 	{
-		assert_eq!(exists("exists X (p(X, Y, X, Y)), rest", &Declarations::new())
+		let exists = |i| original::exists(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free());
+
+		assert_eq!(exists("exists X (p(X, Y, X, Y)), rest")
 			.map(|(i, x)| (i, x.parameters.len())),
 			Ok((", rest", 1)));
-		assert_eq!(exists("exists X p(X, Y, X, Y), rest", &Declarations::new())
+		assert_eq!(exists("exists X p(X, Y, X, Y), rest")
 			.map(|(i, x)| (i, x.parameters.len())),
 			Ok((", rest", 1)));
-		assert!(exists("exists (p(X, Y, X, Y)), rest", &Declarations::new()).is_err());
-		assert!(exists("exists X, rest", &Declarations::new()).is_err());
-		assert!(exists("exists X (), rest", &Declarations::new()).is_err());
-		assert!(exists("exists X (, true), rest", &Declarations::new()).is_err());
-		assert!(exists("exists X (true, ), rest", &Declarations::new()).is_err());
-		assert!(exists("exists X (true false), rest", &Declarations::new()).is_err());
-		assert!(exists("exists X (true), rest", &Declarations::new()).is_ok());
-		assert!(exists("exists X p(X), rest", &Declarations::new()).is_ok());
+		assert!(exists("exists (p(X, Y, X, Y)), rest").is_err());
+		assert!(exists("exists X, rest").is_err());
+		assert!(exists("exists X (), rest").is_err());
+		assert!(exists("exists X (, true), rest").is_err());
+		assert!(exists("exists X (true, ), rest").is_err());
+		assert!(exists("exists X (true false), rest").is_err());
+		assert!(exists("exists X (true), rest").is_ok());
+		assert!(exists("exists X p(X), rest").is_ok());
 	}
 
 	#[test]

@@ -12,7 +12,8 @@ use nom::
 use super::{Declarations, boolean, function_or_predicate_name, integer, special_integer, string,
 	variable_name};
 
-fn negative<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Term>
+fn negative<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	map
 	(
@@ -23,7 +24,7 @@ fn negative<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Term>
 				tag("-"),
 				multispace0,
 			),
-			|i| term_precedence_1(i, d),
+			|i| term_precedence_1(i, d, v),
 		),
 		|x| match x
 		{
@@ -36,7 +37,8 @@ fn negative<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Term>
 	)(i)
 }
 
-fn absolute_value<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Term>
+fn absolute_value<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	map
 	(
@@ -47,7 +49,7 @@ fn absolute_value<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::T
 				tag("|"),
 				multispace0,
 			),
-			|i| term(i, d),
+			|i| term(i, d, v),
 			preceded
 			(
 				multispace0,
@@ -58,7 +60,8 @@ fn absolute_value<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::T
 	)(i)
 }
 
-pub(crate) fn function_or_predicate<'i>(i: &'i str, d: &Declarations)
+pub(crate) fn function_or_predicate<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, (&'i str, Option<crate::Terms>)>
 {
 	pair
@@ -82,7 +85,7 @@ pub(crate) fn function_or_predicate<'i>(i: &'i str, d: &Declarations)
 						tag(","),
 						multispace0,
 					),
-					|i| term(i, d),
+					|i| term(i, d, v),
 				),
 				preceded
 				(
@@ -94,11 +97,12 @@ pub(crate) fn function_or_predicate<'i>(i: &'i str, d: &Declarations)
 	)(i)
 }
 
-fn function<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Function>
+fn function<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Function>
 {
 	map
 	(
-		|i| function_or_predicate(i, d),
+		|i| function_or_predicate(i, d, v),
 		|(name, arguments)|
 		{
 			let arguments = match arguments
@@ -142,23 +146,24 @@ pub(crate) fn variable_declaration(i: &str) -> IResult<&str, crate::VariableDecl
 	)(i)
 }
 
-fn variable<'i>(i: &'i str, d: &Declarations) -> IResult<&'i str, crate::Variable>
+fn variable<'i, 'v>(i: &'i str, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Variable>
 {
 	map
 	(
 		variable_name,
 		|name|
 		{
-			let mut variable_declaration_stack = d.variable_declaration_stack.borrow_mut();
-
-			let declaration = variable_declaration_stack.find_or_create(name);
+			let declaration = v.find_or_create(name);
 
 			crate::Variable::new(declaration)
 		},
 	)(i)
 }
 
-fn term_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	delimited
 	(
@@ -167,7 +172,7 @@ fn term_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crat
 			tag("("),
 			multispace0,
 		),
-		|i| term(i, d),
+		|i| term(i, d, v),
 		preceded
 		(
 			multispace0,
@@ -176,7 +181,9 @@ fn term_parenthesized<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crat
 	)(i)
 }
 
-fn term_precedence_0<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	alt
 	((
@@ -197,7 +204,7 @@ fn term_precedence_0<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 		),
 		map
 		(
-			|i| function(i, d),
+			|i| function(i, d, v),
 			crate::Term::Function,
 		),
 		map
@@ -207,24 +214,28 @@ fn term_precedence_0<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 		),
 		map
 		(
-			|i| variable(i, d),
+			|i| variable(i, v),
 			crate::Term::Variable,
 		),
-		|i| absolute_value(i, d),
-		|i| term_parenthesized(i, d),
+		|i| absolute_value(i, d, v),
+		|i| term_parenthesized(i, d, v),
 	))(i)
 }
 
-fn term_precedence_1<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	alt
 	((
-		|i| negative(i, d),
-		|i| term_precedence_0(i, d),
+		|i| negative(i, d, v),
+		|i| term_precedence_0(i, d, v),
 	))(i)
 }
 
-fn term_precedence_2<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	alt
 	((
@@ -236,7 +247,7 @@ fn term_precedence_2<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 				(
 					terminated
 					(
-						|i| term_precedence_1(i, d),
+						|i| term_precedence_1(i, d, v),
 						delimited
 						(
 							multispace0,
@@ -245,17 +256,19 @@ fn term_precedence_2<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 						),
 					)
 				),
-				|i| term_precedence_1(i, d),
+				|i| term_precedence_1(i, d, v),
 			),
 			|(arguments, last_argument)| arguments.into_iter().rev().fold(last_argument,
 				|accumulator, argument|
 					crate::Term::exponentiate(Box::new(argument), Box::new(accumulator))),
 		),
-		|i| term_precedence_1(i, d),
+		|i| term_precedence_1(i, d, v),
 	))(i)
 }
 
-fn term_precedence_3<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
 	alt
 	((
@@ -263,7 +276,7 @@ fn term_precedence_3<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 		(
 			pair
 			(
-				|i| term_precedence_2(i, d),
+				|i| term_precedence_2(i, d, v),
 				many1
 				(
 					pair
@@ -279,7 +292,7 @@ fn term_precedence_3<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 							)),
 							multispace0,
 						),
-						|i| term_precedence_2(i, d),
+						|i| term_precedence_2(i, d, v),
 					)
 				),
 			),
@@ -294,11 +307,12 @@ fn term_precedence_3<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 					_ => panic!("test"),
 				})
 		),
-		|i| term_precedence_2(i, d),
+		|i| term_precedence_2(i, d, v),
 	))(i)
 }
 
-fn term_precedence_4<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+fn term_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
+	v: &'v crate::VariableDeclarationStackLayer) -> IResult<&'i str, crate::Term>
 {
 	alt
 	((
@@ -306,7 +320,7 @@ fn term_precedence_4<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 		(
 			pair
 			(
-				|i| term_precedence_3(i, d),
+				|i| term_precedence_3(i, d, v),
 				many1
 				(
 					pair
@@ -321,7 +335,7 @@ fn term_precedence_4<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 							)),
 							multispace0,
 						),
-						|i| term_precedence_3(i, d),
+						|i| term_precedence_3(i, d, v),
 					)
 				),
 			),
@@ -335,13 +349,14 @@ fn term_precedence_4<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate
 					_ => panic!("test"),
 				})
 		),
-		|i| term_precedence_3(i, d),
+		|i| term_precedence_3(i, d, v),
 	))(i)
 }
 
-pub fn term<'a>(i: &'a str, d: &Declarations) -> IResult<&'a str, crate::Term>
+pub fn term<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
 {
-	term_precedence_4(i, d)
+	term_precedence_4(i, d, v)
 }
 
 #[cfg(test)]
@@ -349,11 +364,11 @@ mod tests
 {
 	use crate::parse::terms::*;
 	use crate::parse::terms as original;
-	use crate::{Term, VariableDeclaration, VariableDeclarationStack};
+	use crate::{Term, VariableDeclaration, VariableDeclarationStackLayer};
 
 	fn term(i: &str) -> Term
 	{
-		original::term(i, &Declarations::new()).unwrap().1
+		original::term(i, &Declarations::new(), &VariableDeclarationStackLayer::free()).unwrap().1
 	}
 
 	fn format_term(i: &str) -> String
@@ -650,7 +665,8 @@ mod tests
 	#[test]
 	fn parse_bounds()
 	{
-		let term = |i| original::term(i, &Declarations::new()).unwrap().0;
+		let term = |i| original::term(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free()).unwrap().0;
 
 		assert_eq!(term("1 ** 2 ** 3, rest"), ", rest");
 		assert_eq!(term("1 * 2 * 3, rest"), ", rest");
@@ -700,8 +716,10 @@ mod tests
 	#[test]
 	fn parse_function_primitive()
 	{
-		let function = |i| original::function(i, &Declarations::new()).unwrap().1;
-		let function_remainder = |i| original::function(i, &Declarations::new()).unwrap().0;
+		let function = |i| original::function(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free()).unwrap().1;
+		let function_remainder = |i| original::function(i, &Declarations::new(),
+			&VariableDeclarationStackLayer::free()).unwrap().0;
 
 		assert_eq!(function("s").declaration.name, "s");
 		assert_eq!(function("s").declaration.arity, 0);
@@ -752,8 +770,9 @@ mod tests
 	#[test]
 	fn parse_variable_primitive()
 	{
-		let variable = |i| original::variable(i, &Declarations::new()).unwrap().1;
-		let variable_remainder = |i| original::variable(i, &Declarations::new()).unwrap().0;
+		let variable = |i| original::variable(i, &VariableDeclarationStackLayer::free()).unwrap().1;
+		let variable_remainder = |i| original::variable(i,
+			&VariableDeclarationStackLayer::free()).unwrap().0;
 
 		assert_eq!(variable("X Rest").declaration.name, "X");
 		assert_eq!(variable_remainder("X Rest"), " Rest");
@@ -762,7 +781,7 @@ mod tests
 		assert_eq!(variable("Variable_123 Rest").declaration.name, "Variable_123");
 		assert_eq!(variable_remainder("Variable_123 Rest"), " Rest");
 
-		let variable = |i| original::variable(i, &Declarations::new());
+		let variable = |i| original::variable(i, &VariableDeclarationStackLayer::free());
 
 		assert!(variable("0 Rest").is_err());
 		assert!(variable("123_Asd Rest").is_err());
@@ -781,15 +800,10 @@ mod tests
 		let layer_3 = new_variable_declarations(&["E", "F", "Y"]);
 		let layer_4 = new_variable_declarations(&["G", "H", "X"]);
 
-		let variable_declaration_stack = VariableDeclarationStack::new();
-
-		let mut declarations = Declarations::new();
-		declarations.variable_declaration_stack =
-			std::cell::RefCell::new(variable_declaration_stack);
-
-		let variable = |i| original::variable(i, &declarations).unwrap().1;
+		let v_0 = VariableDeclarationStackLayer::free();
+		let variable = |i| original::variable(i, &v_0).unwrap().1;
 		let number_of_free_variable_declarations =
-			|| declarations.variable_declaration_stack.borrow().free_variable_declarations.len();
+			|| v_0.free_variable_declarations_do(|x| x.len());
 
 		let x1 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 1);
@@ -801,8 +815,8 @@ mod tests
 		assert_ne!(x1.declaration, y1.declaration);
 		assert_ne!(x2.declaration, y1.declaration);
 
-		let _guard
-			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_1);
+		let v_1 = VariableDeclarationStackLayer::bound(&v_0, layer_1);
+		let variable = |i| original::variable(i, &v_1).unwrap().1;
 
 		let x3 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -817,8 +831,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_eq!(y1.declaration, y2.declaration);
 
-		let _guard
-			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_2);
+		let v_2 = VariableDeclarationStackLayer::bound(&v_1, layer_2);
+		let variable = |i| original::variable(i, &v_2).unwrap().1;
 
 		let x5 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -831,8 +845,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_eq!(a1.declaration, a2.declaration);
 
-		let _guard
-			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_3);
+		let v_3 = VariableDeclarationStackLayer::bound(&v_2, layer_3);
+		let variable = |i| original::variable(i, &v_3).unwrap().1;
 
 		let x7 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
@@ -841,8 +855,8 @@ mod tests
 		assert_eq!(number_of_free_variable_declarations(), 2);
 		assert_ne!(y2.declaration, y3.declaration);
 
-		let _guard
-			= VariableDeclarationStack::push(&declarations.variable_declaration_stack, layer_4);
+		let v_4 = VariableDeclarationStackLayer::bound(&v_3, layer_4);
+		let variable = |i| original::variable(i, &v_4).unwrap().1;
 
 		let x8 = variable("X");
 		assert_eq!(number_of_free_variable_declarations(), 2);
