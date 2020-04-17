@@ -140,15 +140,12 @@ impl<'p> VariableDeclarationStackLayer<'p>
 	}
 }
 
-#[cfg(test)]
 pub struct Declarations
 {
 	function_declarations: std::cell::RefCell<crate::FunctionDeclarations>,
 	predicate_declarations: std::cell::RefCell<crate::PredicateDeclarations>,
-	//free_variable_declarations: std::cell::RefCell<crate::VariableDeclarations>,
 }
 
-#[cfg(test)]
 impl Declarations
 {
 	pub fn new() -> Self
@@ -157,12 +154,10 @@ impl Declarations
 		{
 			function_declarations: std::cell::RefCell::new(crate::FunctionDeclarations::new()),
 			predicate_declarations: std::cell::RefCell::new(crate::PredicateDeclarations::new()),
-			//free_variable_declarations: std::cell::RefCell::new(vec![]),
 		}
 	}
 }
 
-#[cfg(test)]
 impl FindOrCreateFunctionDeclaration for Declarations
 {
 	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
@@ -190,7 +185,6 @@ impl FindOrCreateFunctionDeclaration for Declarations
 	}
 }
 
-#[cfg(test)]
 impl FindOrCreatePredicateDeclaration for Declarations
 {
 	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
