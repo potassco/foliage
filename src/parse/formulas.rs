@@ -269,9 +269,8 @@ fn quantified_formula<'i, 'b, 'v>(i: &'i str, d: &Declarations,
 					return Err(nom::Err::Failure((i, nom::error::ErrorKind::Many1)));
 				}
 
-				let v2 = crate::VariableDeclarationStackLayer::Bound(
-					crate::BoundVariableDeclarations::new(v,
-						std::rc::Rc::clone(&variable_declarations)));
+				let v2 = crate::VariableDeclarationStackLayer::bound(v,
+					std::rc::Rc::clone(&variable_declarations));
 
 				let (i, argument) = formula_precedence_0(i, d, &v2)?;
 
