@@ -5,7 +5,7 @@ use nom::
 	bytes::complete::tag,
 	character::complete::multispace0,
 	combinator::{cut, map, map_res},
-	multi::{many1, separated_list},
+	multi::{many1, separated_list1},
 	sequence::{delimited, pair, preceded, terminated, tuple},
 };
 
@@ -61,7 +61,7 @@ where
 {
 	map_res
 	(
-		separated_list
+		separated_list1
 		(
 			delimited
 			(
@@ -83,6 +83,7 @@ where
 			}
 			else
 			{
+				// TODO: return more appropriate error type
 				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
 			}
 		}
@@ -96,7 +97,7 @@ where
 {
 	map_res
 	(
-		separated_list
+		separated_list1
 		(
 			delimited
 			(
@@ -118,6 +119,7 @@ where
 			}
 			else
 			{
+				// TODO: return more appropriate error type
 				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
 			}
 		}
@@ -193,7 +195,7 @@ where
 {
 	map_res
 	(
-		separated_list
+		separated_list1
 		(
 			delimited
 			(
@@ -211,6 +213,7 @@ where
 			}
 			else
 			{
+				// TODO: return more appropriate error type
 				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
 			}
 		}
@@ -240,7 +243,7 @@ where
 						delimited
 						(
 							multispace0,
-							separated_list
+							separated_list1
 							(
 								delimited
 								(
@@ -259,15 +262,10 @@ where
 						std::rc::Rc::new,
 					)(i)?;
 
-				if variable_declarations.is_empty()
-				{
-					return Err(nom::Err::Failure((i, nom::error::ErrorKind::Many1)));
-				}
-
-				let v2 = crate::VariableDeclarationStackLayer::bound(v,
+				let bound_variable_declarations = crate::VariableDeclarationStackLayer::bound(v,
 					std::rc::Rc::clone(&variable_declarations));
 
-				let (i, argument) = formula_precedence_0(i, d, &v2)?;
+				let (i, argument) = formula_precedence_0(i, d, &bound_variable_declarations)?;
 
 				Ok((i, crate::QuantifiedFormula::new(variable_declarations, Box::new(argument))))
 			}
