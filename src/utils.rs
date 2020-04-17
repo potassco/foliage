@@ -15,22 +15,6 @@ pub trait FindVariableDeclaration
 	fn find_variable_declaration(&self, name: &str) -> std::rc::Rc<crate::VariableDeclaration>;
 }
 
-pub struct FreeVariableDeclarations
-{
-	variable_declarations: std::cell::RefCell<crate::VariableDeclarations>,
-}
-
-impl FreeVariableDeclarations
-{
-	pub fn new() -> Self
-	{
-		Self
-		{
-			variable_declarations: std::cell::RefCell::new(vec![]),
-		}
-	}
-}
-
 pub struct BoundVariableDeclarations<'p>
 {
 	parent: &'p VariableDeclarationStackLayer<'p>,
@@ -52,7 +36,7 @@ impl<'p> BoundVariableDeclarations<'p>
 
 pub enum VariableDeclarationStackLayer<'p>
 {
-	Free(FreeVariableDeclarations),
+	Free(std::cell::RefCell<crate::VariableDeclarations>),
 	Bound(BoundVariableDeclarations<'p>),
 }
 
@@ -60,7 +44,7 @@ impl<'p> VariableDeclarationStackLayer<'p>
 {
 	pub fn free() -> Self
 	{
-		Self::Free(FreeVariableDeclarations::new())
+		Self::Free(std::cell::RefCell::new(vec![]))
 	}
 
 	pub fn bound(parent: &'p VariableDeclarationStackLayer<'p>,
@@ -73,9 +57,9 @@ impl<'p> VariableDeclarationStackLayer<'p>
 	{
 		match self
 		{
-			VariableDeclarationStackLayer::Free(free) =>
+			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
-				if let Some(variable_declaration) = free.variable_declarations.borrow().iter()
+				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
 					.find(|x| x.name == variable_name)
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
@@ -83,15 +67,16 @@ impl<'p> VariableDeclarationStackLayer<'p>
 
 				None
 			},
-			VariableDeclarationStackLayer::Bound(bound) =>
+			VariableDeclarationStackLayer::Bound(bound_variable_declarations) =>
 			{
-				if let Some(variable_declaration) = bound.variable_declarations.iter()
+				if let Some(variable_declaration) = bound_variable_declarations
+					.variable_declarations.iter()
 					.find(|x| x.name == variable_name)
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
 				}
 
-				bound.parent.find(variable_name)
+				bound_variable_declarations.parent.find(variable_name)
 			},
 		}
 	}
@@ -100,9 +85,9 @@ impl<'p> VariableDeclarationStackLayer<'p>
 	{
 		match self
 		{
-			VariableDeclarationStackLayer::Free(free) =>
+			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
-				if let Some(variable_declaration) = free.variable_declarations.borrow().iter()
+				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
 					.find(|x| x.name == variable_name)
 				{
 					return std::rc::Rc::clone(&variable_declaration);
@@ -114,20 +99,21 @@ impl<'p> VariableDeclarationStackLayer<'p>
 				};
 				let variable_declaration = std::rc::Rc::new(variable_declaration);
 
-				free.variable_declarations.borrow_mut()
+				free_variable_declarations.borrow_mut()
 					.push(std::rc::Rc::clone(&variable_declaration));
 
 				variable_declaration
 			},
-			VariableDeclarationStackLayer::Bound(bound) =>
+			VariableDeclarationStackLayer::Bound(bound_variable_declarations) =>
 			{
-				if let Some(variable_declaration) = bound.variable_declarations.iter()
+				if let Some(variable_declaration) = bound_variable_declarations
+					.variable_declarations.iter()
 					.find(|x| x.name == variable_name)
 				{
 					return std::rc::Rc::clone(&variable_declaration);
 				}
 
-				bound.parent.find_or_create(variable_name)
+				bound_variable_declarations.parent.find_or_create(variable_name)
 			},
 		}
 	}
@@ -139,9 +125,10 @@ impl<'p> VariableDeclarationStackLayer<'p>
 	{
 		match self
 		{
-			VariableDeclarationStackLayer::Free(free) => f(&free.variable_declarations.borrow()),
-			VariableDeclarationStackLayer::Bound(bound)
-				=> bound.parent.free_variable_declarations_do(f),
+			VariableDeclarationStackLayer::Free(free_variable_declarations)
+				=> f(&free_variable_declarations.borrow()),
+			VariableDeclarationStackLayer::Bound(bound_variable_declarations)
+				=> bound_variable_declarations.parent.free_variable_declarations_do(f),
 		}
 	}
 }

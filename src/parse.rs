@@ -14,7 +14,7 @@ pub struct Declarations
 {
 	function_declarations: std::cell::RefCell<crate::FunctionDeclarations>,
 	predicate_declarations: std::cell::RefCell<crate::PredicateDeclarations>,
-	free_variable_declarations: crate::FreeVariableDeclarations,
+	free_variable_declarations: std::cell::RefCell<crate::VariableDeclarations>,
 }
 
 impl Declarations
@@ -25,7 +25,7 @@ impl Declarations
 		{
 			function_declarations: std::cell::RefCell::new(crate::FunctionDeclarations::new()),
 			predicate_declarations: std::cell::RefCell::new(crate::PredicateDeclarations::new()),
-			free_variable_declarations: crate::FreeVariableDeclarations::new(),
+			free_variable_declarations: std::cell::RefCell::new(vec![]),
 		}
 	}
 }
