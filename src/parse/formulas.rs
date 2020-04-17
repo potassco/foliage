@@ -9,10 +9,12 @@ use nom::
 	sequence::{delimited, pair, preceded, terminated, tuple},
 };
 
-use super::{Declarations, boolean, word_boundary};
+use super::{boolean, word_boundary};
 
-pub fn predicate<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+pub fn predicate<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Predicate>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -25,34 +27,17 @@ pub fn predicate<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDec
 				None => vec![],
 			};
 
-			let mut predicate_declarations = d.predicate_declarations.borrow_mut();
-
-			let declaration = match predicate_declarations.iter()
-				.find(|x| x.name == name && x.arity == arguments.len())
-			{
-				Some(declaration) => std::rc::Rc::clone(&declaration),
-				None =>
-				{
-					let declaration = crate::PredicateDeclaration
-					{
-						name: name.to_string(),
-						arity: arguments.len(),
-					};
-					let declaration = std::rc::Rc::new(declaration);
-
-					predicate_declarations.insert(std::rc::Rc::clone(&declaration));
-
-					declaration
-				},
-			};
+			let declaration = d.find_or_create_predicate_declaration(name, arguments.len());
 
 			crate::Predicate::new(declaration, arguments)
 		},
 	)(i)
 }
 
-fn not<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn not<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -69,8 +54,10 @@ fn not<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationSt
 	)(i)
 }
 
-fn and<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn and<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formulas>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map_res
 	(
@@ -102,8 +89,10 @@ fn and<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationSt
 	)(i)
 }
 
-fn or<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn or<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formulas>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map_res
 	(
@@ -135,9 +124,10 @@ fn or<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationSta
 	)(i)
 }
 
-fn implies_left_to_right<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn implies_left_to_right<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -165,9 +155,10 @@ fn implies_left_to_right<'i, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn implies_right_to_left<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn implies_right_to_left<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -195,8 +186,10 @@ fn implies_right_to_left<'i, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn if_and_only_if<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn if_and_only_if<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formulas>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map_res
 	(
@@ -224,9 +217,11 @@ fn if_and_only_if<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDe
 	)(i)
 }
 
-fn quantified_formula<'i, 'b, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer, keyword: &'b str)
+fn quantified_formula<'i, 'b, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer,
+	keyword: &'b str)
 	-> IResult<&'i str, crate::QuantifiedFormula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	preceded
 	(
@@ -280,8 +275,10 @@ fn quantified_formula<'i, 'b, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn compare<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn compare<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Compare>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -335,21 +332,26 @@ fn compare<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarati
 	)(i)
 }
 
-fn exists<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn exists<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::QuantifiedFormula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	quantified_formula(i, d, v, "exists")
 }
 
-fn for_all<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn for_all<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::QuantifiedFormula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	quantified_formula(i, d, v, "forall")
 }
 
-fn formula_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_parenthesized<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	delimited
 	(
@@ -367,9 +369,10 @@ fn formula_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn formula_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_0<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -392,9 +395,10 @@ fn formula_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_1<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -412,9 +416,10 @@ fn formula_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_2<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -423,9 +428,10 @@ fn formula_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_3<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -438,9 +444,10 @@ fn formula_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_4<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -453,9 +460,10 @@ fn formula_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_5<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_5<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -465,9 +473,10 @@ fn formula_precedence_5<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn formula_precedence_6<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn formula_precedence_6<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -480,8 +489,10 @@ fn formula_precedence_6<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-pub fn formula<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+pub fn formula<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Formula>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	formula_precedence_6(i, d, v)
 }
@@ -489,9 +500,9 @@ pub fn formula<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDecla
 #[cfg(test)]
 mod tests
 {
-	use crate::parse::formulas::*;
-	use crate::parse::formulas as original;
 	use crate::{Formula, ImplicationDirection, Term, VariableDeclarationStackLayer};
+	use crate::parse::formulas as original;
+	use crate::utils::*;
 
 	fn formula(i: &str) -> Formula
 	{

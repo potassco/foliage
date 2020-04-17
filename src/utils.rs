@@ -1,18 +1,13 @@
-pub trait FindFunctionDeclaration
+pub trait FindOrCreateFunctionDeclaration
 {
-	fn find_function_declaration(&self, name: &str, arity: usize)
+	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
 		-> std::rc::Rc<crate::FunctionDeclaration>;
 }
 
-pub trait FindPredicateDeclaration
+pub trait FindOrCreatePredicateDeclaration
 {
-	fn find_predicate_declaration(&self, name: &str, arity: usize)
+	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
 		-> std::rc::Rc<crate::PredicateDeclaration>;
-}
-
-pub trait FindVariableDeclaration
-{
-	fn find_variable_declaration(&self, name: &str) -> std::rc::Rc<crate::VariableDeclaration>;
 }
 
 pub struct BoundVariableDeclarations<'p>
@@ -141,6 +136,84 @@ impl<'p> VariableDeclarationStackLayer<'p>
 				=> f(&free_variable_declarations.borrow()),
 			VariableDeclarationStackLayer::Bound(bound_variable_declarations)
 				=> bound_variable_declarations.parent.free_variable_declarations_do(f),
+		}
+	}
+}
+
+#[cfg(test)]
+pub struct Declarations
+{
+	function_declarations: std::cell::RefCell<crate::FunctionDeclarations>,
+	predicate_declarations: std::cell::RefCell<crate::PredicateDeclarations>,
+	//free_variable_declarations: std::cell::RefCell<crate::VariableDeclarations>,
+}
+
+#[cfg(test)]
+impl Declarations
+{
+	pub fn new() -> Self
+	{
+		Self
+		{
+			function_declarations: std::cell::RefCell::new(crate::FunctionDeclarations::new()),
+			predicate_declarations: std::cell::RefCell::new(crate::PredicateDeclarations::new()),
+			//free_variable_declarations: std::cell::RefCell::new(vec![]),
+		}
+	}
+}
+
+#[cfg(test)]
+impl FindOrCreateFunctionDeclaration for Declarations
+{
+	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<crate::FunctionDeclaration>
+	{
+		let mut function_declarations = self.function_declarations.borrow_mut();
+
+		match function_declarations.iter().find(|x| x.name == name && x.arity == arity)
+		{
+			Some(declaration) => std::rc::Rc::clone(&declaration),
+			None =>
+			{
+				let declaration = crate::FunctionDeclaration
+				{
+					name: name.to_string(),
+					arity,
+				};
+				let declaration = std::rc::Rc::new(declaration);
+
+				function_declarations.insert(std::rc::Rc::clone(&declaration));
+
+				declaration
+			},
+		}
+	}
+}
+
+#[cfg(test)]
+impl FindOrCreatePredicateDeclaration for Declarations
+{
+	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<crate::PredicateDeclaration>
+	{
+		let mut predicate_declarations = self.predicate_declarations.borrow_mut();
+
+		match predicate_declarations.iter().find(|x| x.name == name && x.arity == arity)
+		{
+			Some(declaration) => std::rc::Rc::clone(&declaration),
+			None =>
+			{
+				let declaration = crate::PredicateDeclaration
+				{
+					name: name.to_string(),
+					arity,
+				};
+				let declaration = std::rc::Rc::new(declaration);
+
+				predicate_declarations.insert(std::rc::Rc::clone(&declaration));
+
+				declaration
+			},
 		}
 	}
 }

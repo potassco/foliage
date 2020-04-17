@@ -9,11 +9,12 @@ use nom::
 	sequence::{delimited, pair, preceded, terminated},
 };
 
-use super::{Declarations, boolean, function_or_predicate_name, integer, special_integer, string,
-	variable_name};
+use super::{boolean, function_or_predicate_name, integer, special_integer, string, variable_name};
 
-fn negative<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn negative<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -37,8 +38,10 @@ fn negative<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarat
 	)(i)
 }
 
-fn absolute_value<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn absolute_value<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -60,9 +63,11 @@ fn absolute_value<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDe
 	)(i)
 }
 
-pub(crate) fn function_or_predicate<'i, 'v>(i: &'i str, d: &Declarations,
+pub(crate) fn function_or_predicate<'i, 'v, D>(i: &'i str, d: &D,
 	v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, (&'i str, Option<crate::Terms>)>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	pair
 	(
@@ -97,8 +102,10 @@ pub(crate) fn function_or_predicate<'i, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn function<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+fn function<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Function>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	map
 	(
@@ -111,26 +118,7 @@ fn function<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarat
 				None => vec![],
 			};
 
-			let mut function_declarations = d.function_declarations.borrow_mut();
-
-			let declaration = match function_declarations.iter()
-				.find(|x| x.name == name && x.arity == arguments.len())
-			{
-				Some(declaration) => std::rc::Rc::clone(&declaration),
-				None =>
-				{
-					let declaration = crate::FunctionDeclaration
-					{
-						name: name.to_string(),
-						arity: arguments.len(),
-					};
-					let declaration = std::rc::Rc::new(declaration);
-
-					function_declarations.insert(std::rc::Rc::clone(&declaration));
-
-					declaration
-				},
-			};
+			let declaration = d.find_or_create_function_declaration(name, arguments.len());
 
 			crate::Function::new(declaration, arguments)
 		},
@@ -161,9 +149,10 @@ fn variable<'i, 'v>(i: &'i str, v: &'v crate::VariableDeclarationStackLayer)
 	)(i)
 }
 
-fn term_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn term_parenthesized<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	delimited
 	(
@@ -181,9 +170,10 @@ fn term_parenthesized<'i, 'v>(i: &'i str, d: &Declarations,
 	)(i)
 }
 
-fn term_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn term_precedence_0<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -222,9 +212,10 @@ fn term_precedence_0<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn term_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn term_precedence_1<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -233,9 +224,10 @@ fn term_precedence_1<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn term_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn term_precedence_2<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -266,9 +258,10 @@ fn term_precedence_2<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn term_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer)
+fn term_precedence_3<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -311,8 +304,10 @@ fn term_precedence_3<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-fn term_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
-	v: &'v crate::VariableDeclarationStackLayer) -> IResult<&'i str, crate::Term>
+fn term_precedence_4<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
+	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	alt
 	((
@@ -353,8 +348,10 @@ fn term_precedence_4<'i, 'v>(i: &'i str, d: &Declarations,
 	))(i)
 }
 
-pub fn term<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarationStackLayer)
+pub fn term<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
 	-> IResult<&'i str, crate::Term>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
 {
 	term_precedence_4(i, d, v)
 }
@@ -362,9 +359,9 @@ pub fn term<'i, 'v>(i: &'i str, d: &Declarations, v: &'v crate::VariableDeclarat
 #[cfg(test)]
 mod tests
 {
-	use crate::parse::terms::*;
-	use crate::parse::terms as original;
 	use crate::{Term, VariableDeclaration, VariableDeclarationStackLayer};
+	use crate::parse::terms as original;
+	use crate::utils::*;
 
 	fn term(i: &str) -> Term
 	{
