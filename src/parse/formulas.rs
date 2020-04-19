@@ -290,16 +290,6 @@ where
 				((
 					map
 					(
-						tag(">"),
-						|_| crate::ComparisonOperator::Greater,
-					),
-					map
-					(
-						tag("<"),
-						|_| crate::ComparisonOperator::Less,
-					),
-					map
-					(
 						tag("<="),
 						|_| crate::ComparisonOperator::LessOrEqual,
 					),
@@ -307,6 +297,16 @@ where
 					(
 						tag(">="),
 						|_| crate::ComparisonOperator::GreaterOrEqual,
+					),
+					map
+					(
+						tag(">"),
+						|_| crate::ComparisonOperator::Greater,
+					),
+					map
+					(
+						tag("<"),
+						|_| crate::ComparisonOperator::Less,
 					),
 					map
 					(
