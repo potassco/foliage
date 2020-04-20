@@ -489,12 +489,17 @@ mod tests
 
 		assert_eq!(term_as_function("s").declaration.name, "s");
 		assert_eq!(term_as_function("s").declaration.arity, 0);
+		assert!(term_as_function("s").arguments.is_empty());
 		assert_eq!(term_as_function("s()").declaration.name, "s");
-		assert_eq!(term_as_function("s").declaration.arity, 0);
+		assert_eq!(term_as_function("s()").declaration.arity, 0);
+		assert!(term_as_function("s()").arguments.is_empty());
 		assert_eq!(term_as_function("s(1, 2, 3)").declaration.name, "s");
 		assert_eq!(term_as_function("s(1, 2, 3)").declaration.arity, 3);
+		assert_eq!(term_as_function("s(1, 2, 3)").arguments.len(), 3);
 		assert_eq!(term_as_function("s(1, 2, 3)").arguments.remove(0), Term::integer(1));
 		assert_eq!(term_as_function("s(1, 2, 3)").arguments.remove(2), Term::integer(3));
+
+		assert_eq!(format_term("n"), "n");
 	}
 
 	#[test]

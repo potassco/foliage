@@ -4,7 +4,7 @@ use nom::
 	branch::alt,
 	bytes::complete::tag,
 	character::complete::multispace0,
-	combinator::{cut, map, map_res},
+	combinator::{cut, map, map_res, peek},
 	multi::{many1, separated_list1},
 	sequence::{delimited, pair, preceded, terminated, tuple},
 };
@@ -286,39 +286,43 @@ where
 			delimited
 			(
 				multispace0,
-				alt
-				((
-					map
-					(
-						tag("<="),
-						|_| crate::ComparisonOperator::LessOrEqual,
-					),
-					map
-					(
-						tag(">="),
-						|_| crate::ComparisonOperator::GreaterOrEqual,
-					),
-					map
-					(
-						tag(">"),
-						|_| crate::ComparisonOperator::Greater,
-					),
-					map
-					(
-						tag("<"),
-						|_| crate::ComparisonOperator::Less,
-					),
-					map
-					(
-						tag("!="),
-						|_| crate::ComparisonOperator::NotEqual,
-					),
-					map
-					(
-						tag("="),
-						|_| crate::ComparisonOperator::Equal,
-					),
-				)),
+				terminated
+				(
+					alt
+					((
+						map
+						(
+							tag("<="),
+							|_| crate::ComparisonOperator::LessOrEqual,
+						),
+						map
+						(
+							tag(">="),
+							|_| crate::ComparisonOperator::GreaterOrEqual,
+						),
+						map
+						(
+							tag("<"),
+							|_| crate::ComparisonOperator::Less,
+						),
+						map
+						(
+							tag(">"),
+							|_| crate::ComparisonOperator::Greater,
+						),
+						map
+						(
+							tag("!="),
+							|_| crate::ComparisonOperator::NotEqual,
+						),
+						map
+						(
+							tag("="),
+							|_| crate::ComparisonOperator::Equal,
+						),
+					)),
+					peek(nom::combinator::not(tag("-"))),
+				),
 				multispace0,
 			),
 			|i| crate::parse::term(i, d, v),
@@ -381,13 +385,13 @@ where
 		),
 		map
 		(
-			|i| predicate(i, d, v),
-			crate::Formula::Predicate,
+			|i| compare(i, d, v),
+			crate::Formula::Compare,
 		),
 		map
 		(
-			|i| compare(i, d, v),
-			crate::Formula::Compare,
+			|i| predicate(i, d, v),
+			crate::Formula::Predicate,
 		),
 		|i| formula_parenthesized(i, d, v),
 	))(i)
@@ -533,6 +537,15 @@ mod tests
 		assert_eq!(format_formula("(a -> b -> c) <-> (d -> e -> f)"), "a -> b -> c <-> d -> e -> f");
 		assert_eq!(format_formula("a <- b <- c <-> d <- e <- f"), "a <- b <- c <-> d <- e <- f");
 		assert_eq!(format_formula("(a <- b <- c) <-> (d <- e <- f)"), "a <- b <- c <-> d <- e <- f");
+	}
+
+	#[test]
+	fn parse_compare()
+	{
+		assert_eq!(format_formula("X >= 0"), "X >= 0");
+		assert_eq!(format_formula("N >= 0"), "N >= 0");
+		assert_eq!(format_formula("n < 0"), "n < 0");
+		assert_eq!(format_formula("n >= 0"), "n >= 0");
 	}
 
 	#[test]
