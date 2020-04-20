@@ -542,10 +542,11 @@ mod tests
 	#[test]
 	fn parse_compare()
 	{
-		assert_eq!(format_formula("X >= 0"), "X >= 0");
-		assert_eq!(format_formula("N >= 0"), "N >= 0");
-		assert_eq!(format_formula("n < 0"), "n < 0");
-		assert_eq!(format_formula("n >= 0"), "n >= 0");
+		assert_eq!(format_formula("X>=0."), "X >= 0");
+		assert_eq!(format_formula("N>=0."), "N >= 0");
+		assert_eq!(format_formula("n<0."), "n < 0");
+		assert_eq!(format_formula("n>=0."), "n >= 0");
+		assert_eq!(format_formula("p(0)>=q."), "p(0) >= q");
 	}
 
 	#[test]

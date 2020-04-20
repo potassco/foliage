@@ -28,6 +28,7 @@ fn is_character_word_boundary(c: char) -> bool
 		| '%'
 		| '|'
 		| '#'
+		| '.'
 			=> true,
 		_ => false,
 	}

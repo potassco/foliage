@@ -185,7 +185,7 @@ mod tests
 		assert!(integer("10000a").is_err());
 		assert!(integer("+10000a").is_err());
 		assert!(integer("-10000a").is_err());
-		assert!(integer("1.5").is_err());
+		assert_eq!(integer("1.5"), Ok((".5", 1)));
 		assert!(integer("a").is_err());
 		assert!(integer("-").is_err());
 		assert!(integer(" ").is_err());
