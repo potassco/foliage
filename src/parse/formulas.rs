@@ -265,7 +265,7 @@ where
 				let bound_variable_declarations = crate::VariableDeclarationStackLayer::bound(v,
 					std::rc::Rc::clone(&variable_declarations));
 
-				let (i, argument) = formula_precedence_0(i, d, &bound_variable_declarations)?;
+				let (i, argument) = formula_precedence_2(i, d, &bound_variable_declarations)?;
 
 				Ok((i, crate::QuantifiedFormula::new(variable_declarations, Box::new(argument))))
 			}
