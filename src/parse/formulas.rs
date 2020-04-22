@@ -1,740 +1,386 @@
-use nom::
-{
-	IResult,
-	branch::alt,
-	bytes::complete::tag,
-	character::complete::multispace0,
-	combinator::{cut, map, map_res, peek},
-	multi::{many1, separated_list1},
-	sequence::{delimited, pair, preceded, terminated, tuple},
-};
+use super::tokens::*;
 
-use super::{boolean, word_boundary};
-
-pub fn predicate<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Predicate>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
+pub fn parse_formula(input: &str) -> Result<crate::Formula, crate::parse::Error>
 {
-	map
-	(
-		|i| crate::parse::terms::function_or_predicate(i, d, v),
-		|(name, arguments)|
+	let formula_str = FormulaStr::new(input);
+	formula_str.parse(0)?;
+
+	// TODO: implement correctly
+	Ok(crate::Formula::true_())
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum FormulaInfixOperator
+{
+	And,
+	IfAndOnlyIf,
+	ImpliesLeftToRight,
+	ImpliesRightToLeft,
+	Or,
+}
+
+impl FormulaInfixOperator
+{
+	fn level(&self) -> usize
+	{
+		match self
 		{
-			let arguments = match arguments
+			Self::And => 1,
+			Self::Or => 2,
+			Self::ImpliesLeftToRight
+			| Self::ImpliesRightToLeft => 3,
+			Self::IfAndOnlyIf => 4,
+		}
+	}
+}
+
+impl std::fmt::Debug for FormulaInfixOperator
+{
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		match &self
+		{
+			Self::And => write!(formatter, "and"),
+			Self::IfAndOnlyIf => write!(formatter, "<->"),
+			Self::ImpliesLeftToRight => write!(formatter, "->"),
+			Self::ImpliesRightToLeft => write!(formatter, "<-"),
+			Self::Or => write!(formatter, "or"),
+		}
+	}
+}
+
+struct FormulaStr<'i>
+{
+	input: &'i str,
+}
+
+impl<'i> FormulaStr<'i>
+{
+	pub fn new(input: &'i str) -> Self
+	{
+		Self
+		{
+			input,
+		}
+	}
+
+	pub fn top_level_infix_operator(&self)
+		-> Result<Option<FormulaInfixOperator>, crate::parse::Error>
+	{
+		let mut top_level_infix_operator = None;
+
+		for infix_operator in self.iter_infix_operators()
+		{
+			let (_, _, infix_operator) = infix_operator?;
+
+			top_level_infix_operator = match top_level_infix_operator
 			{
-				Some(arguments) => arguments,
-				None => vec![],
+				None => Some(infix_operator),
+				Some(top_level_infix_operator) =>
+				{
+					if (infix_operator == FormulaInfixOperator::ImpliesLeftToRight
+							&& top_level_infix_operator == FormulaInfixOperator::ImpliesRightToLeft)
+						|| (infix_operator == FormulaInfixOperator::ImpliesRightToLeft
+							&& top_level_infix_operator == FormulaInfixOperator::ImpliesLeftToRight)
+					{
+						return Err(crate::parse::Error::new_mixed_implication_directions(
+							crate::parse::error::Location::new(0, Some(0)),
+							crate::parse::error::Location::new(0, Some(0))));
+					}
+
+					if infix_operator.level() > top_level_infix_operator.level()
+					{
+						Some(infix_operator)
+					}
+					else
+					{
+						Some(top_level_infix_operator)
+					}
+				},
+			}
+		}
+
+		Ok(top_level_infix_operator)
+	}
+
+	pub fn iter_infix_operators(&self) -> FormulaInfixOperatorIterator<'i>
+	{
+		FormulaInfixOperatorIterator::new(self.input)
+	}
+
+	pub fn split_at_infix_operator(&self, infix_operator: FormulaInfixOperator)
+		-> SplitFormulaAtInfixOperator<'i>
+	{
+		SplitFormulaAtInfixOperator::new(self, infix_operator)
+	}
+
+	pub fn parse(&self, level: usize) -> Result<(), crate::parse::Error>
+	{
+		let indentation = "  ".repeat(level);
+		println!("{}- parsing: {}", indentation, self.input);
+
+		let input = self.input.trim_start();
+
+		match self.top_level_infix_operator()?
+		{
+			None =>
+			{
+				if let Some((identifier, _)) = identifier(input)
+				{
+					match identifier
+					{
+						"exists" => println!("{}  parsing “exists” expression from: {}", indentation, input),
+						"forall" => println!("{}  parsing “forall” expression from: {}", indentation, input),
+						_ => (),
+					}
+				}
+
+				println!("{}  can’t break down any further: {}", indentation, input)
+			},
+			Some(top_level_infix_operator) =>
+			{
+				println!("{}  parsing “{:?}” expression from: {}", indentation,
+					top_level_infix_operator, input);
+
+				for subformula in self.split_at_infix_operator(top_level_infix_operator)
+				{
+					FormulaStr::new(subformula?).parse(level + 1)?;
+				}
+			},
+		}
+
+		Ok(())
+	}
+}
+
+struct FormulaInfixOperatorIterator<'i>
+{
+	original_input: &'i str,
+	input: &'i str,
+}
+
+impl<'i> FormulaInfixOperatorIterator<'i>
+{
+	pub fn new(input: &'i str) -> Self
+	{
+		Self
+		{
+			original_input: input,
+			input,
+		}
+	}
+}
+
+impl<'i> std::iter::Iterator for FormulaInfixOperatorIterator<'i>
+{
+	type Item = Result<(&'i str, &'i str, FormulaInfixOperator), crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		loop
+		{
+			self.input = self.input.trim_start();
+
+			let first_character = match self.input.chars().next()
+			{
+				None => return None,
+				Some(first_character) => first_character,
 			};
 
-			let declaration = d.find_or_create_predicate_declaration(name, arguments.len());
-
-			crate::Predicate::new(declaration, arguments)
-		},
-	)(i)
-}
-
-fn not<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map
-	(
-		preceded
-		(
-			terminated
-			(
-				tag("not"),
-				multispace0,
-			),
-			|i| formula_precedence_2(i, d, v),
-		),
-		|x| crate::Formula::not(Box::new(x)),
-	)(i)
-}
-
-fn and<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formulas>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map_res
-	(
-		separated_list1
-		(
-			delimited
-			(
-				multispace0,
-				terminated
-				(
-					tag("and"),
-					word_boundary,
-				),
-				multispace0,
-			),
-			|i| formula_precedence_2(i, d, v),
-		),
-		|arguments| -> Result<_, (_, _)>
-		{
-			if arguments.len() >= 2
+			if self.input.starts_with(")")
 			{
-				Ok(arguments.into_iter().collect())
+				return Some(Err(crate::parse::Error::new_unmatched_parenthesis(
+					crate::parse::error::Location::new(0, Some(1)))));
 			}
-			else
+
+			match parenthesized_expression(self.input)
 			{
-				// TODO: return more appropriate error type
-				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
+				Ok(Some((_, remaining_input))) =>
+				{
+					self.input = remaining_input;
+					continue;
+				},
+				Ok(None) => (),
+				Err(error) => return Some(Err(error)),
+			}
+
+			match number(self.input)
+			{
+				Ok(Some((_, remaining_input))) =>
+				{
+					self.input = remaining_input;
+					continue;
+				}
+				Ok(None) => (),
+				Err(error) => return Some(Err(error)),
+			}
+
+			let index_left = self.input.as_ptr() as usize - self.original_input.as_ptr() as usize;
+			let input_left = self.original_input.split_at(index_left).0.trim_end();
+
+			if let Some((identifier, remaining_input)) = identifier(self.input)
+			{
+				self.input = remaining_input;
+
+				match identifier
+				{
+					"and" =>
+						return Some(Ok((input_left, remaining_input, FormulaInfixOperator::And))),
+					"or" =>
+						return Some(Ok((input_left, remaining_input, FormulaInfixOperator::Or))),
+					_ => continue,
+				}
+			}
+
+			if let Some((symbol, remaining_input)) = symbol(self.input)
+			{
+				self.input = remaining_input;
+
+				match symbol
+				{
+					Symbol::ArrowLeft => return Some(Ok((input_left, remaining_input,
+						FormulaInfixOperator::ImpliesRightToLeft))),
+					Symbol::ArrowLeftAndRight => return Some(Ok((input_left, remaining_input,
+						FormulaInfixOperator::IfAndOnlyIf))),
+					Symbol::ArrowRight => return Some(Ok((input_left, remaining_input,
+						FormulaInfixOperator::ImpliesLeftToRight))),
+					_ => continue,
+				}
+			}
+
+			return Some(Err(crate::parse::Error::new_character_not_allowed(first_character,
+				crate::parse::error::Location::new(0, Some(0)))));
+		}
+	}
+}
+
+struct SplitFormulaAtInfixOperator<'i>
+{
+	infix_operator_iterator: FormulaInfixOperatorIterator<'i>,
+	infix_operator: FormulaInfixOperator,
+	previous_index: usize,
+}
+
+impl<'i> SplitFormulaAtInfixOperator<'i>
+{
+	pub fn new(input: &FormulaStr<'i>, infix_operator: FormulaInfixOperator)
+		-> Self
+	{
+		Self
+		{
+			infix_operator_iterator: input.iter_infix_operators(),
+			infix_operator,
+			previous_index: 0,
+		}
+	}
+}
+
+impl<'i> std::iter::Iterator for SplitFormulaAtInfixOperator<'i>
+{
+	type Item = Result<&'i str, crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		loop
+		{
+			let (input_left, input_right, infix_operator) =
+				match self.infix_operator_iterator.next()
+			{
+				Some(Err(error)) => return Some(Err(error)),
+				Some(Ok(infix_operator_iterator_next)) => infix_operator_iterator_next,
+				None => break,
+			};
+
+			if infix_operator == self.infix_operator
+			{
+				// TODO: refactor
+				let index = input_left.as_ptr() as usize
+					+ input_left.len()
+					- self.infix_operator_iterator.original_input.as_ptr() as usize;
+				let split_input = &self.infix_operator_iterator
+					.original_input[self.previous_index..index].trim();
+				self.previous_index = input_right.as_ptr() as usize
+					- self.infix_operator_iterator.original_input.as_ptr() as usize;
+
+				return Some(Ok(split_input));
 			}
 		}
-	)(i)
-}
 
-fn or<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formulas>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map_res
-	(
-		separated_list1
-		(
-			delimited
-			(
-				multispace0,
-				terminated
-				(
-					tag("or"),
-					word_boundary,
-				),
-				multispace0,
-			),
-			|i| formula_precedence_3(i, d, v),
-		),
-		|arguments| -> Result<_, (_, _)>
+		let remaining_input = self.infix_operator_iterator
+			.original_input[self.previous_index..].trim();
+
+		if remaining_input.is_empty()
 		{
-			if arguments.len() >= 2
-			{
-				Ok(arguments.into_iter().collect())
-			}
-			else
-			{
-				// TODO: return more appropriate error type
-				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
-			}
+			None
 		}
-	)(i)
-}
-
-fn implies_left_to_right<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map
-	(
-		pair
-		(
-			many1
-			(
-				terminated
-				(
-					|i| formula_precedence_4(i, d, v),
-					delimited
-					(
-						multispace0,
-						tag("->"),
-						multispace0,
-					),
-				)
-			),
-			|i| formula_precedence_4(i, d, v),
-		),
-		|(arguments, last_argument)| arguments.into_iter().rev().fold(last_argument,
-			|accumulator, argument|
-				crate::Formula::implies(crate::ImplicationDirection::LeftToRight,
-					Box::new(argument), Box::new(accumulator)))
-	)(i)
-}
-
-fn implies_right_to_left<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map
-	(
-		pair
-		(
-			|i| formula_precedence_4(i, d, v),
-			many1
-			(
-				preceded
-				(
-					delimited
-					(
-						multispace0,
-						tag("<-"),
-						multispace0,
-					),
-					|i| formula_precedence_4(i, d, v),
-				)
-			),
-		),
-		|(first_argument, arguments)| arguments.into_iter().fold(first_argument,
-			|accumulator, argument|
-				crate::Formula::implies(crate::ImplicationDirection::RightToLeft,
-					Box::new(argument), Box::new(accumulator)))
-	)(i)
-}
-
-fn if_and_only_if<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formulas>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map_res
-	(
-		separated_list1
-		(
-			delimited
-			(
-				multispace0,
-				tag("<->"),
-				multispace0,
-			),
-			|i| formula_precedence_5(i, d, v),
-		),
-		|arguments| -> Result<_, (_, _)>
+		else
 		{
-			if arguments.len() >= 2
-			{
-				Ok(arguments.into_iter().collect())
-			}
-			else
-			{
-				// TODO: return more appropriate error type
-				Err(nom::error::make_error(i, nom::error::ErrorKind::Many1))
-			}
+			self.previous_index = self.infix_operator_iterator.original_input.len();
+
+			Some(Ok(remaining_input))
 		}
-	)(i)
-}
-
-fn quantified_formula<'i, 'b, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer,
-	keyword: &'b str)
-	-> IResult<&'i str, crate::QuantifiedFormula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	preceded
-	(
-		terminated
-		(
-			tag(keyword),
-			word_boundary,
-		),
-		cut
-		(
-			|i|
-			{
-				let (i, variable_declarations) =
-					map
-					(
-						delimited
-						(
-							multispace0,
-							separated_list1
-							(
-								delimited
-								(
-									multispace0,
-									tag(","),
-									multispace0,
-								),
-								map
-								(
-									crate::parse::terms::variable_declaration,
-									std::rc::Rc::new,
-								),
-							),
-							multispace0,
-						),
-						std::rc::Rc::new,
-					)(i)?;
-
-				let bound_variable_declarations = crate::VariableDeclarationStackLayer::bound(v,
-					std::rc::Rc::clone(&variable_declarations));
-
-				let (i, argument) = formula_precedence_2(i, d, &bound_variable_declarations)?;
-
-				Ok((i, crate::QuantifiedFormula::new(variable_declarations, Box::new(argument))))
-			}
-		),
-	)(i)
-}
-
-fn compare<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Compare>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	map
-	(
-		tuple
-		((
-			|i| crate::parse::term(i, d, v),
-			delimited
-			(
-				multispace0,
-				terminated
-				(
-					alt
-					((
-						map
-						(
-							tag("<="),
-							|_| crate::ComparisonOperator::LessOrEqual,
-						),
-						map
-						(
-							tag(">="),
-							|_| crate::ComparisonOperator::GreaterOrEqual,
-						),
-						map
-						(
-							tag("<"),
-							|_| crate::ComparisonOperator::Less,
-						),
-						map
-						(
-							tag(">"),
-							|_| crate::ComparisonOperator::Greater,
-						),
-						map
-						(
-							tag("!="),
-							|_| crate::ComparisonOperator::NotEqual,
-						),
-						map
-						(
-							tag("="),
-							|_| crate::ComparisonOperator::Equal,
-						),
-					)),
-					peek(nom::combinator::not(tag("-"))),
-				),
-				multispace0,
-			),
-			|i| crate::parse::term(i, d, v),
-		)),
-		|(left, operator, right)|
-		{
-			crate::Compare::new(operator, Box::new(left), Box::new(right))
-		}
-	)(i)
-}
-
-fn exists<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::QuantifiedFormula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	quantified_formula(i, d, v, "exists")
-}
-
-fn for_all<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::QuantifiedFormula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	quantified_formula(i, d, v, "forall")
-}
-
-fn formula_parenthesized<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	delimited
-	(
-		terminated
-		(
-			tag("("),
-			multispace0,
-		),
-		|i| formula(i, d, v),
-		preceded
-		(
-			multispace0,
-			tag(")"),
-		),
-	)(i)
-}
-
-fn formula_precedence_0<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		map
-		(
-			boolean,
-			crate::Formula::Boolean,
-		),
-		map
-		(
-			|i| compare(i, d, v),
-			crate::Formula::Compare,
-		),
-		map
-		(
-			|i| predicate(i, d, v),
-			crate::Formula::Predicate,
-		),
-		|i| formula_parenthesized(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_1<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		map
-		(
-			|i| exists(i, d, v),
-			crate::Formula::Exists,
-		),
-		map
-		(
-			|i| for_all(i, d, v),
-			crate::Formula::ForAll,
-		),
-		|i| formula_precedence_0(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_2<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		|i| not(i, d, v),
-		|i| formula_precedence_1(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_3<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		map
-		(
-			|i| and(i, d, v),
-			crate::Formula::And,
-		),
-		|i| formula_precedence_2(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_4<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		map
-		(
-			|i| or(i, d, v),
-			crate::Formula::Or,
-		),
-		|i| formula_precedence_3(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_5<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		|i| implies_left_to_right(i, d, v),
-		|i| implies_right_to_left(i, d, v),
-		|i| formula_precedence_4(i, d, v),
-	))(i)
-}
-
-fn formula_precedence_6<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	alt
-	((
-		map
-		(
-			|i| if_and_only_if(i, d, v),
-			crate::Formula::IfAndOnlyIf,
-		),
-		|i| formula_precedence_5(i, d, v),
-	))(i)
-}
-
-pub fn formula<'i, 'v, D>(i: &'i str, d: &D, v: &'v crate::VariableDeclarationStackLayer)
-	-> IResult<&'i str, crate::Formula>
-where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration
-{
-	formula_precedence_6(i, d, v)
+	}
 }
 
 #[cfg(test)]
 mod tests
 {
-	use crate::{Formula, ImplicationDirection, Term, VariableDeclarationStackLayer};
-	use crate::parse::formulas as original;
-	use crate::utils::*;
-
-	fn formula(i: &str) -> Formula
-	{
-		original::formula(i, &Declarations::new(), &VariableDeclarationStackLayer::free())
-			.unwrap().1
-	}
-
-	fn formula_remainder(i: &str) -> &str
-	{
-		original::formula(i, &Declarations::new(), &VariableDeclarationStackLayer::free())
-			.unwrap().0
-	}
-
-	fn format_formula(i: &str) -> String
-	{
-		format!("{}", formula(i))
-	}
+	use super::*;
 
 	#[test]
-	fn parse_boolean()
+	fn tokenize_formula_infix_operators()
 	{
-		assert_eq!(formula("true"), Formula::true_());
-		assert_eq!(formula("false"), Formula::false_());
-	}
+		let f = FormulaStr::new("((forall X exists Y (p(X) -> q(Y)) and false) or p) -> false");
+		assert_eq!(f.top_level_infix_operator().unwrap(),
+			Some(FormulaInfixOperator::ImpliesLeftToRight));
+		let mut i = f.iter_infix_operators();
+		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::ImpliesLeftToRight);
+		assert!(i.next().is_none());
 
-	#[test]
-	fn parse_precedence()
-	{
-		assert_eq!(format_formula("a -> b -> c <-> d -> e -> f"), "a -> b -> c <-> d -> e -> f");
-		assert_eq!(format_formula("(a -> b -> c) <-> (d -> e -> f)"), "a -> b -> c <-> d -> e -> f");
-		assert_eq!(format_formula("a <- b <- c <-> d <- e <- f"), "a <- b <- c <-> d <- e <- f");
-		assert_eq!(format_formula("(a <- b <- c) <-> (d <- e <- f)"), "a <- b <- c <-> d <- e <- f");
-	}
+		let f = FormulaStr::new("forall X exists Y (p(X) -> q(Y)) and false or p -> false");
+		assert_eq!(f.top_level_infix_operator().unwrap(),
+			Some(FormulaInfixOperator::ImpliesLeftToRight));
+		let mut i = f.iter_infix_operators();
+		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::And);
+		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::Or);
+		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::ImpliesLeftToRight);
+		assert!(i.next().is_none());
 
-	#[test]
-	fn parse_compare()
-	{
-		assert_eq!(format_formula("X>=0."), "X >= 0");
-		assert_eq!(format_formula("N>=0."), "N >= 0");
-		assert_eq!(format_formula("n<0."), "n < 0");
-		assert_eq!(format_formula("n>=0."), "n >= 0");
-		assert_eq!(format_formula("p(0)>=q."), "p(0) >= q");
-	}
+		let f = FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ");
+		assert_eq!(f.top_level_infix_operator().unwrap(),
+			Some(FormulaInfixOperator::ImpliesLeftToRight));
+		let mut i = f.split_at_infix_operator(FormulaInfixOperator::ImpliesLeftToRight);
+		assert_eq!(i.next().unwrap().unwrap(), "p");
+		assert_eq!(i.next().unwrap().unwrap(), "forall X exists Y (p(X) -> q(Y)) and false or p");
+		assert_eq!(i.next().unwrap().unwrap(), "false");
+		assert!(i.next().is_none());
 
-	#[test]
-	fn parse_exists()
-	{
-		let formula_as_exists = |i| match formula(i)
-		{
-			Formula::Exists(exists) => exists,
-			_ => panic!("expected existentially quantified formula"),
-		};
+		let f = FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ");
+		assert_eq!(f.top_level_infix_operator().unwrap(),
+			Some(FormulaInfixOperator::ImpliesLeftToRight));
+		let mut i = f.split_at_infix_operator(FormulaInfixOperator::And);
+		assert_eq!(i.next().unwrap().unwrap(), "p -> forall X exists Y (p(X) -> q(Y))");
+		assert_eq!(i.next().unwrap().unwrap(), "false or p -> false");
+		assert!(i.next().is_none());
 
-		let as_predicate = |x| match x
-		{
-			Formula::Predicate(arguments) => arguments,
-			_ => panic!("expected predicate"),
-		};
+		let f = FormulaStr::new("  p and forall X exists Y (p(X) -> q(Y)) and false or p or false  ");
+		assert_eq!(f.top_level_infix_operator().unwrap(), Some(FormulaInfixOperator::Or));
+		let mut i = f.split_at_infix_operator(FormulaInfixOperator::Or);
+		assert_eq!(i.next().unwrap().unwrap(), "p and forall X exists Y (p(X) -> q(Y)) and false");
+		assert_eq!(i.next().unwrap().unwrap(), "p");
+		assert_eq!(i.next().unwrap().unwrap(), "false");
+		assert!(i.next().is_none());
 
-		assert_eq!(format_formula("exists  X , Y , Z  ( p )"), "exists X, Y, Z p");
-		assert_eq!(formula_as_exists("exists  X , Y , Z  ( p )").parameters.len(), 3);
-		assert_eq!(as_predicate(*formula_as_exists("exists  X , Y , Z  ( p )").argument)
-			.declaration.name, "p");
-	}
+		let f = FormulaStr::new(" (p and q) ");
+		assert!(f.top_level_infix_operator().unwrap().is_none());
+		let mut i = f.split_at_infix_operator(FormulaInfixOperator::And);
+		assert_eq!(i.next().unwrap().unwrap(), "(p and q)");
+		assert!(i.next().is_none());
 
-	#[test]
-	fn parse_and()
-	{
-		let formula_as_and = |i| match formula(i)
-		{
-			Formula::And(arguments) => arguments,
-			_ => panic!("expected conjunction"),
-		};
+		assert!(FormulaStr::new(" a -> b -> c ").parse(0).is_ok());
+		assert!(FormulaStr::new(" a -> b <- c ").parse(0).is_err());
 
-		let as_predicate = |x| match x
-		{
-			Formula::Predicate(arguments) => arguments,
-			_ => panic!("expected predicate"),
-		};
-
-		assert_eq!(format_formula("(true  and  false)"), "true and false");
-		assert_eq!(formula_as_and("(true and false)").len(), 2);
-		assert_eq!(formula_as_and("(true and false)").remove(0), Formula::true_());
-		assert_eq!(formula_as_and("(true and false)").remove(1), Formula::false_());
-		// The order of elements is retained
-		assert_ne!(formula("(true and false)"), formula("false and true"));
-		assert_eq!(format_formula("(p  and  q  and  r  and  s)"), "p and q and r and s");
-		assert_eq!(
-			as_predicate(formula_as_and("(p and q and r and s)").remove(0)).declaration.name, "p");
-		assert_eq!(
-			as_predicate(formula_as_and("(p and q and r and s)").remove(3)).declaration.name, "s");
-
-		let formula = |i| original::formula(i, &Declarations::new(),
-			&VariableDeclarationStackLayer::free());
-
-		// Malformed formulas shouldn’t be accepted
-		assert!(formula("and").is_err());
-		assert!(formula("and p").is_err());
-		assert_eq!(formula_remainder("p and"), " and");
-		assert_eq!(formula_remainder("p andq"), " andq");
-		assert_eq!(formula_remainder("p and q and"), " and");
-		assert_eq!(formula_remainder("p and q andq"), " andq");
-		assert!(formula("(p and) q").is_err());
-		assert_eq!(formula_remainder("p (and q)"), " (and q)");
-	}
-
-	#[test]
-	fn parse_or()
-	{
-		let formula_as_or = |i| match formula(i)
-		{
-			Formula::Or(arguments) => arguments,
-			_ => panic!("expected disjunction"),
-		};
-
-		let as_predicate = |x| match x
-		{
-			Formula::Predicate(arguments) => arguments,
-			_ => panic!("expected predicate"),
-		};
-
-		assert_eq!(format_formula("(true  or  false)"), "true or false");
-		assert_eq!(formula_as_or("(true or false)").len(), 2);
-		assert_eq!(formula_as_or("(true or false)").remove(0), Formula::true_());
-		assert_eq!(formula_as_or("(true or false)").remove(1), Formula::false_());
-		// The order of elements is retained
-		assert_ne!(formula("(true or false)"), formula("false or true)"));
-		assert_eq!(format_formula("(p  or  q  or  r  or  s)"), "p or q or r or s");
-		assert_eq!(
-			as_predicate(formula_as_or("(p or q or r or s)").remove(0)).declaration.name, "p");
-		assert_eq!(
-			as_predicate(formula_as_or("(p or q or r or s)").remove(3)).declaration.name, "s");
-
-		let formula = |i| original::formula(i, &Declarations::new(),
-			&VariableDeclarationStackLayer::free());
-
-		// Malformed formulas shouldn’t be accepted
-		assert!(formula("or").is_err());
-		assert!(formula("or p").is_err());
-		assert_eq!(formula_remainder("p or"), " or");
-		assert_eq!(formula_remainder("p orq"), " orq");
-		assert_eq!(formula_remainder("p or q or"), " or");
-		assert_eq!(formula_remainder("p or q orq"), " orq");
-		assert!(formula("(p or) q").is_err());
-		assert_eq!(formula_remainder("p (or q)"), " (or q)");
-	}
-
-	#[test]
-	fn parse_implies()
-	{
-		let formula_as_implies = |i| match formula(i)
-		{
-			Formula::Implies(implies) => implies,
-			_ => panic!("expected implication"),
-		};
-
-		let as_predicate = |x| match x
-		{
-			Formula::Predicate(arguments) => arguments,
-			_ => panic!("expected predicate"),
-		};
-
-		assert_eq!(as_predicate(*formula_as_implies("a -> b").antecedent).declaration.name, "a");
-		assert_eq!(as_predicate(*formula_as_implies("a -> b").implication).declaration.name, "b");
-		assert_eq!(formula_as_implies("a -> b").direction, ImplicationDirection::LeftToRight);
-
-		assert_eq!(as_predicate(*formula_as_implies("a <- b").antecedent).declaration.name, "b");
-		assert_eq!(as_predicate(*formula_as_implies("a <- b").implication).declaration.name, "a");
-		assert_eq!(formula_as_implies("a <- b").direction, ImplicationDirection::RightToLeft);
-
-		assert_eq!(format_formula("(a -> b -> c)"), "a -> b -> c");
-		assert_eq!(format_formula("(a -> (b -> c))"), "a -> b -> c");
-		assert_eq!(format_formula("((a -> b) -> c)"), "(a -> b) -> c");
-	}
-
-	#[test]
-	fn parse_predicate()
-	{
-		let predicate = |i| original::predicate(i, &Declarations::new(),
-			&VariableDeclarationStackLayer::free()).unwrap().1;
-		let predicate_remainder = |i| original::predicate(i, &Declarations::new(),
-			&VariableDeclarationStackLayer::free()).unwrap().0;
-
-		assert_eq!(predicate("s").declaration.name, "s");
-		assert_eq!(predicate("s").declaration.arity, 0);
-		assert_eq!(predicate_remainder("s"), "");
-		assert_eq!(predicate("s ( )").declaration.name, "s");
-		assert_eq!(predicate("s ( )").declaration.arity, 0);
-		assert_eq!(predicate_remainder("s ( )"), "");
-		assert_eq!(predicate("s ( 1 , 2 , 3 )").declaration.name, "s");
-		assert_eq!(predicate("s ( 1 , 2 , 3 )").declaration.arity, 3);
-		assert_eq!(predicate("s ( 1 , 2 , 3 )").arguments.remove(0), Term::integer(1));
-		assert_eq!(predicate("s ( 1 , 2 , 3 )").arguments.remove(1), Term::integer(2));
-		assert_eq!(predicate("s ( 1 , 2 , 3 )").arguments.remove(2), Term::integer(3));
-		assert_eq!(predicate_remainder("s ( 1 , 2 , 3 )"), "");
-		assert_eq!(predicate_remainder("s ( 1 , 2 , 3 )"), "");
-		assert_eq!(predicate("s ( ), rest").declaration.name, "s");
-		assert_eq!(predicate("s ( ), rest").declaration.arity, 0);
-		assert_eq!(predicate_remainder("s ( ), rest"), ", rest");
-		assert_eq!(predicate("s ( 1 , 2 , 3 ), rest").declaration.name, "s");
-		assert_eq!(predicate("s ( 1 , 2 , 3 ), rest").declaration.arity, 3);
-		assert_eq!(predicate_remainder("s ( 1 , 2 , 3 ), rest"), ", rest");
-	}
-
-	#[test]
-	fn parse_exists_primitive()
-	{
-		let exists = |i| original::exists(i, &Declarations::new(),
-			&VariableDeclarationStackLayer::free());
-
-		assert_eq!(exists("exists X (p(X, Y, X, Y)), rest")
-			.map(|(i, x)| (i, x.parameters.len())),
-			Ok((", rest", 1)));
-		assert_eq!(exists("exists X p(X, Y, X, Y), rest")
-			.map(|(i, x)| (i, x.parameters.len())),
-			Ok((", rest", 1)));
-		assert!(exists("exists (p(X, Y, X, Y)), rest").is_err());
-		assert!(exists("exists X, rest").is_err());
-		assert!(exists("exists X (), rest").is_err());
-		assert!(exists("exists X (, true), rest").is_err());
-		assert!(exists("exists X (true, ), rest").is_err());
-		assert!(exists("exists X (true false), rest").is_err());
-		assert!(exists("exists X (true), rest").is_ok());
-		assert!(exists("exists X p(X), rest").is_ok());
-	}
-
-	#[test]
-	fn parse_formula()
-	{
-		// TODO: refactor
-		formula("exists X, Y (p(X, Y, X, Y) and X < Y and q(X) <-> r(X)), rest");
+		assert!(!FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ")
+			.parse(0).is_ok());
 	}
 }
