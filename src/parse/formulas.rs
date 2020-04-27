@@ -1,6 +1,7 @@
+use super::terms::*;
 use super::tokens::*;
 
-pub fn parse_formula(input: &str) -> Result<crate::Formula, crate::parse::Error>
+pub fn formula(input: &str) -> Result<crate::Formula, crate::parse::Error>
 {
 	let formula_str = FormulaStr::new(input);
 	formula_str.parse(0)?;
@@ -9,8 +10,13 @@ pub fn parse_formula(input: &str) -> Result<crate::Formula, crate::parse::Error>
 	Ok(crate::Formula::true_())
 }
 
+pub(crate) fn predicate_name(identifier: &str) -> Option<(&str, &str)>
+{
+	function_name(identifier)
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
-enum FormulaInfixOperator
+enum LogicalConnective
 {
 	And,
 	IfAndOnlyIf,
@@ -19,7 +25,8 @@ enum FormulaInfixOperator
 	Or,
 }
 
-impl FormulaInfixOperator
+// TODO: rename to logic infix connective
+impl LogicalConnective
 {
 	fn level(&self) -> usize
 	{
@@ -34,7 +41,7 @@ impl FormulaInfixOperator
 	}
 }
 
-impl std::fmt::Debug for FormulaInfixOperator
+impl std::fmt::Debug for LogicalConnective
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -64,102 +71,389 @@ impl<'i> FormulaStr<'i>
 		}
 	}
 
-	pub fn top_level_infix_operator(&self)
-		-> Result<Option<FormulaInfixOperator>, crate::parse::Error>
+	fn iter_tokens(&self) -> TokenIterator<'i>
 	{
-		let mut top_level_infix_operator = None;
+		TokenIterator::new(self.input)
+	}
 
-		for infix_operator in self.iter_infix_operators()
+	fn filter_logical_connective(&self, logical_connective: LogicalConnective)
+		-> std::iter::Filter<TokenIterator<'i>, impl FnMut(&Result<(usize, usize, Token<'i>), crate::parse::Error>) -> bool>
+	{
+		let token_selector = move |token: &_| match token
 		{
-			let (_, _, infix_operator) = infix_operator?;
-
-			top_level_infix_operator = match top_level_infix_operator
+			Ok((_, _, Token::Identifier(ref identifier))) => match *identifier
 			{
-				None => Some(infix_operator),
-				Some(top_level_infix_operator) =>
+				"and" => logical_connective == LogicalConnective::And,
+				"or" => logical_connective == LogicalConnective::Or,
+				_ => false,
+			},
+			Ok((_, _, Token::Symbol(ref symbol))) => match symbol
+			{
+				Symbol::ArrowLeft => logical_connective == LogicalConnective::ImpliesRightToLeft,
+				Symbol::ArrowLeftAndRight => logical_connective == LogicalConnective::IfAndOnlyIf,
+				Symbol::ArrowRight => logical_connective == LogicalConnective::ImpliesLeftToRight,
+				_ => false,
+			},
+			_ => false,
+		};
+
+		self.iter_tokens().filter(token_selector)
+	}
+
+	pub fn top_level_logical_connective(&self)
+		-> Result<Option<LogicalConnective>, crate::parse::Error>
+	{
+		let logical_connective = |token| match token
+		{
+			Token::Identifier(identifier) => match identifier
+			{
+				"and" => Some(LogicalConnective::And),
+				"or" => Some(LogicalConnective::Or),
+				_ => None,
+			},
+			Token::Symbol(symbol) => match symbol
+			{
+				Symbol::ArrowLeft => Some(LogicalConnective::ImpliesRightToLeft),
+				Symbol::ArrowLeftAndRight => Some(LogicalConnective::IfAndOnlyIf),
+				Symbol::ArrowRight => Some(LogicalConnective::ImpliesLeftToRight),
+				_ => None,
+			},
+			_ => None,
+		};
+
+		let mut top_level_logical_connective = None;
+
+		for token in self.iter_tokens()
+		{
+			let (_, _, token) = token?;
+			let logical_connective = match logical_connective(token)
+			{
+				Some(logical_connective) => logical_connective,
+				None => continue,
+			};
+
+			top_level_logical_connective = match top_level_logical_connective
+			{
+				None => Some(logical_connective),
+				Some(top_level_logical_connective) =>
 				{
-					if (infix_operator == FormulaInfixOperator::ImpliesLeftToRight
-							&& top_level_infix_operator == FormulaInfixOperator::ImpliesRightToLeft)
-						|| (infix_operator == FormulaInfixOperator::ImpliesRightToLeft
-							&& top_level_infix_operator == FormulaInfixOperator::ImpliesLeftToRight)
+					if (logical_connective == LogicalConnective::ImpliesLeftToRight
+							&& top_level_logical_connective == LogicalConnective::ImpliesRightToLeft)
+						|| (logical_connective == LogicalConnective::ImpliesRightToLeft
+							&& top_level_logical_connective == LogicalConnective::ImpliesLeftToRight)
 					{
 						return Err(crate::parse::Error::new_mixed_implication_directions(
 							crate::parse::error::Location::new(0, Some(0)),
 							crate::parse::error::Location::new(0, Some(0))));
 					}
 
-					if infix_operator.level() > top_level_infix_operator.level()
+					if logical_connective.level() > top_level_logical_connective.level()
 					{
-						Some(infix_operator)
+						Some(logical_connective)
 					}
 					else
 					{
-						Some(top_level_infix_operator)
+						Some(top_level_logical_connective)
 					}
 				},
 			}
 		}
 
-		Ok(top_level_infix_operator)
+		Ok(top_level_logical_connective)
 	}
 
-	pub fn iter_infix_operators(&self) -> FormulaInfixOperatorIterator<'i>
+	fn filter_comparison_operators(&self)
+		-> std::iter::FilterMap<TokenIterator<'i>, impl FnMut(Result<(usize, usize, Token<'i>), crate::parse::Error>)
+			-> Option<Result<(usize, usize, crate::ComparisonOperator), crate::parse::Error>>>
 	{
-		FormulaInfixOperatorIterator::new(self.input)
+		let token_functor = |token| match token
+		{
+			Ok((input_left, remaining_input, Token::Symbol(symbol))) => match symbol
+			{
+				Symbol::Greater =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::Greater))),
+				Symbol::GreaterOrEqual =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::GreaterOrEqual))),
+				Symbol::Less =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::Less))),
+				Symbol::LessOrEqual =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::LessOrEqual))),
+				Symbol::Equal =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::Equal))),
+				Symbol::NotEqual =>
+					return Some(Ok((input_left, remaining_input,
+						crate::ComparisonOperator::NotEqual))),
+				_ => None,
+			},
+			Err(error) => Some(Err(error)),
+			_ => None,
+		};
+
+		self.iter_tokens().filter_map(token_functor)
 	}
 
-	pub fn split_at_infix_operator(&self, infix_operator: FormulaInfixOperator)
-		-> SplitFormulaAtInfixOperator<'i>
-	{
-		SplitFormulaAtInfixOperator::new(self, infix_operator)
-	}
-
-	pub fn parse(&self, level: usize) -> Result<(), crate::parse::Error>
+	pub fn parse(&self, level: usize) -> Result<crate::Formula, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
-		println!("{}- parsing: {}", indentation, self.input);
-
 		let input = self.input.trim_start();
 
-		match self.top_level_infix_operator()?
+		println!("{}- parsing formula: {}", indentation, input);
+
+		match input.chars().next()
 		{
-			None =>
-			{
-				if let Some((identifier, _)) = identifier(input)
-				{
-					match identifier
-					{
-						"exists" => println!("{}  parsing “exists” expression from: {}", indentation, input),
-						"forall" => println!("{}  parsing “forall” expression from: {}", indentation, input),
-						_ => (),
-					}
-				}
-
-				println!("{}  can’t break down any further: {}", indentation, input)
-			},
-			Some(top_level_infix_operator) =>
-			{
-				println!("{}  parsing “{:?}” expression from: {}", indentation,
-					top_level_infix_operator, input);
-
-				for subformula in self.split_at_infix_operator(top_level_infix_operator)
-				{
-					FormulaStr::new(subformula?).parse(level + 1)?;
-				}
-			},
+			Some(')') => return Err(crate::parse::Error::new_unmatched_parenthesis(
+				crate::parse::error::Location::new(0, Some(0)))),
+			None => return Err(crate::parse::Error::new_empty_input(
+				crate::parse::error::Location::new(0, Some(0)))),
+			_ => (),
 		}
 
-		Ok(())
+		// Parse logical infix connectives
+		if let Some(top_level_logical_connective) = self.top_level_logical_connective()?
+		{
+			println!("{}  parsing “{:?}” infix formula", indentation, top_level_logical_connective);
+
+			// Parse arguments of n-ary logical infix connectives
+			let arguments_n_ary = ||
+			{
+				// TODO: improve error handling if the formulas between the operators are invalid
+				TokenSplit::new(self.filter_logical_connective(top_level_logical_connective),
+					self.input)
+					.map(|subformula| FormulaStr::new(subformula?).parse(level + 1))
+					.collect::<Result<Vec<_>, _>>()
+			};
+
+			match top_level_logical_connective
+			{
+				LogicalConnective::And => return Ok(crate::Formula::and(arguments_n_ary()?)),
+				LogicalConnective::Or => return Ok(crate::Formula::or(arguments_n_ary()?)),
+				LogicalConnective::IfAndOnlyIf =>
+					return Ok(crate::Formula::if_and_only_if(arguments_n_ary()?)),
+				LogicalConnective::ImpliesLeftToRight =>
+					return implication_left_to_right(
+						TokenSplit::new(
+							self.filter_logical_connective(top_level_logical_connective),
+							self.input),
+						level + 1),
+				/*LogicalConnective::ImpliesRightToLeft => unimplemented!(),*/
+				_ =>
+				{
+					println!("{}  TODO: parse implication", indentation);
+
+					// TODO: implement correctly
+					return Ok(crate::Formula::true_());
+				}
+			}
+		}
+
+		// Parse quantified formulas
+		if let Some((identifier, input)) = identifier(input)
+		{
+			let quantifier = match identifier
+			{
+				"exists" => Some(Quantifier::Existential),
+				"forall" => Some(Quantifier::Universal),
+				_ => None,
+			};
+
+			if let Some(quantifier) = quantifier
+			{
+				let input = input.trim_start();
+				println!("{}  parsing “{:?}” formula body: {}", indentation, quantifier, input);
+
+				return quantified_formula(input, quantifier, level + 1);
+			}
+		}
+
+		let mut comparison_operators = self.filter_comparison_operators();
+
+		// Parse comparisons
+		if let Some(comparison_operator) = comparison_operators.next()
+		{
+			let (_, _, comparison_operator) = comparison_operator?;
+
+			// Comparisons with more than one comparison operator aren’t supported
+			if let Some(next_comparison_operator) = comparison_operators.next()
+			{
+				let (_, _, next_comparison_operator) = next_comparison_operator?;
+
+				return Err(crate::parse::Error::new_multiple_comparison_operators(
+					comparison_operator, next_comparison_operator,
+					crate::parse::error::Location::new(0, Some(0))));
+			}
+
+			println!("{}  parsing “{:?}” comparison: {}", indentation, comparison_operator, input);
+
+			let mut comparison_operator_split =
+				TokenSplit::new(self.filter_comparison_operators(), self.input);
+
+			// There’s exactly one comparison operator in this formula, as we have verified above.
+			// Hence, the split is guaranteed to generate exactly these two elements
+			let input_left = comparison_operator_split.next().unwrap()?;
+			let input_right = comparison_operator_split.next().unwrap()?;
+
+			let argument_left = TermStr::new(input_left).parse(level + 1)?;
+			let argument_right = TermStr::new(input_right).parse(level + 1)?;
+
+			return Ok(crate::Formula::compare(comparison_operator, Box::new(argument_left),
+				Box::new(argument_right)));
+		}
+
+		// Parse predicates
+		if let Some((predicate_name, input)) = predicate_name(input)
+		{
+			println!("{}  TODO: parse predicate {}", indentation, predicate_name);
+
+			let input = input.trim_start();
+
+			// Parse arguments if there are any
+			/*let arguments = match parenthesized_expression(input)?
+			{
+				Some((parenthesized_expression, remaining_input)) =>
+				{
+					unimplemented!();
+				}
+				None => unimplemented!(),
+			};*/
+
+			// TODO: implement correctly
+			return Ok(crate::Formula::true_());
+		}
+
+		// Parse parenthesized formulas
+		if let Some('(') = input.chars().next()
+		{
+			match parenthesized_expression(input)?
+			{
+				Some((parenthesized_expression, remaining_input)) =>
+				{
+					if !remaining_input.trim().is_empty()
+					{
+						return Err(crate::parse::Error::new_unexpected_token(
+							crate::parse::error::Location::new(0, Some(0))));
+					}
+
+					return FormulaStr::new(parenthesized_expression).parse(level);
+				},
+				None => unreachable!(),
+			}
+		};
+
+		println!("{}  can’t break down formula any further: {}", indentation, input);
+
+		// TODO: implement correctly
+		Ok(crate::Formula::true_())
 	}
 }
 
-struct FormulaInfixOperatorIterator<'i>
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum Quantifier
+{
+	Existential,
+	Universal,
+}
+
+impl std::fmt::Debug for Quantifier
+{
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		match &self
+		{
+			Self::Existential => write!(formatter, "exists"),
+			Self::Universal => write!(formatter, "forall"),
+		}
+	}
+}
+
+// TODO: refactor
+fn implication_left_to_right_inner<'i, T>(
+	mut split_formula_at_logical_connective: TokenSplit<'i, T, Token<'i>>, level: usize)
+	-> Result<Option<crate::Formula>, crate::parse::Error>
+where
+	T: std::iter::Iterator<Item = Result<(usize, usize, Token<'i>), crate::parse::Error>>
+{
+	match split_formula_at_logical_connective.next()
+	{
+		Some(argument) =>
+		{
+			// TODO: improve error handling if antecedent cannot be parsed
+			let argument = FormulaStr::new(argument?).parse(level)?;
+			match implication_left_to_right_inner(split_formula_at_logical_connective, level)?
+			{
+				Some(next_argument) => Ok(Some(crate::Formula::implies(
+					crate::ImplicationDirection::LeftToRight, Box::new(argument),
+					Box::new(next_argument)))),
+				None => Ok(Some(argument)),
+			}
+		},
+		None => Ok(None),
+	}
+}
+
+fn implication_left_to_right<'i, T>(
+	mut split_formula_at_logical_connective: TokenSplit<'i, T, Token<'i>>, level: usize)
+	-> Result<crate::Formula, crate::parse::Error>
+where
+	T: std::iter::Iterator<Item = Result<(usize, usize, Token<'i>), crate::parse::Error>>
+{
+	match split_formula_at_logical_connective.next()
+	{
+		Some(argument) =>
+		{
+			// TODO: improve error handling if antecedent cannot be parsed
+			let argument = FormulaStr::new(argument?).parse(level)?;
+			match implication_left_to_right_inner(split_formula_at_logical_connective, level)?
+			{
+				Some(next_argument) => Ok(crate::Formula::implies(
+					crate::ImplicationDirection::LeftToRight, Box::new(argument),
+					Box::new(next_argument))),
+				None => Err(crate::parse::Error::new_expected_logical_connective_argument(
+					"left-to-right implication".to_string(),
+					crate::parse::error::Location::new(0, Some(0)))),
+			}
+		},
+		None => Err(crate::parse::Error::new_expected_logical_connective_argument(
+			"left-to-right implication".to_string(),
+			crate::parse::error::Location::new(0, Some(0)))),
+	}
+}
+
+fn quantified_formula(input: &str, quantifier: Quantifier, level: usize)
+	-> Result<crate::Formula, crate::parse::Error>
+{
+	let (parameters, input) = match variable_declarations(input)?
+	{
+		Some(variable_declarations) => variable_declarations,
+		None => return Err(crate::parse::Error::new_expected_variable_declaration(
+			crate::parse::error::Location::new(0, Some(0)))),
+	};
+	let parameters = std::rc::Rc::new(parameters);
+
+	let formula_str = FormulaStr::new(input.trim());
+	let formula = Box::new(formula_str.parse(level)?);
+
+	// TODO: push variable stack layer
+	let formula = match quantifier
+	{
+		Quantifier::Existential => crate::Formula::exists(parameters, formula),
+		Quantifier::Universal => crate::Formula::for_all(parameters, formula),
+	};
+
+	Ok(formula)
+}
+
+/*struct ComparisonOperatorIterator<'i>
 {
 	original_input: &'i str,
 	input: &'i str,
 }
 
-impl<'i> FormulaInfixOperatorIterator<'i>
+impl<'i> ComparisonOperatorIterator<'i>
 {
 	pub fn new(input: &'i str) -> Self
 	{
@@ -171,9 +465,10 @@ impl<'i> FormulaInfixOperatorIterator<'i>
 	}
 }
 
-impl<'i> std::iter::Iterator for FormulaInfixOperatorIterator<'i>
+// TODO: refactor
+impl<'i> std::iter::Iterator for ComparisonOperatorIterator<'i>
 {
-	type Item = Result<(&'i str, &'i str, FormulaInfixOperator), crate::parse::Error>;
+	type Item = Result<(&'i str, &'i str, crate::ComparisonOperator), crate::parse::Error>;
 
 	fn next(&mut self) -> Option<Self::Item>
 	{
@@ -218,109 +513,49 @@ impl<'i> std::iter::Iterator for FormulaInfixOperatorIterator<'i>
 			let index_left = self.input.as_ptr() as usize - self.original_input.as_ptr() as usize;
 			let input_left = self.original_input.split_at(index_left).0.trim_end();
 
-			if let Some((identifier, remaining_input)) = identifier(self.input)
-			{
-				self.input = remaining_input;
-
-				match identifier
-				{
-					"and" =>
-						return Some(Ok((input_left, remaining_input, FormulaInfixOperator::And))),
-					"or" =>
-						return Some(Ok((input_left, remaining_input, FormulaInfixOperator::Or))),
-					_ => continue,
-				}
-			}
-
 			if let Some((symbol, remaining_input)) = symbol(self.input)
 			{
 				self.input = remaining_input;
 
 				match symbol
 				{
-					Symbol::ArrowLeft => return Some(Ok((input_left, remaining_input,
-						FormulaInfixOperator::ImpliesRightToLeft))),
-					Symbol::ArrowLeftAndRight => return Some(Ok((input_left, remaining_input,
-						FormulaInfixOperator::IfAndOnlyIf))),
-					Symbol::ArrowRight => return Some(Ok((input_left, remaining_input,
-						FormulaInfixOperator::ImpliesLeftToRight))),
+					Symbol::Greater =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::Greater))),
+					Symbol::GreaterOrEqual =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::GreaterOrEqual))),
+					Symbol::Less =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::Less))),
+					Symbol::LessOrEqual =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::LessOrEqual))),
+					Symbol::Equal =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::Equal))),
+					Symbol::NotEqual =>
+						return Some(Ok((input_left, remaining_input,
+							crate::ComparisonOperator::NotEqual))),
 					_ => continue,
 				}
+			}
+
+			match identifier(self.input)
+			{
+				Some((_, remaining_input)) =>
+				{
+					self.input = remaining_input;
+					continue;
+				}
+				None => (),
 			}
 
 			return Some(Err(crate::parse::Error::new_character_not_allowed(first_character,
 				crate::parse::error::Location::new(0, Some(0)))));
 		}
 	}
-}
-
-struct SplitFormulaAtInfixOperator<'i>
-{
-	infix_operator_iterator: FormulaInfixOperatorIterator<'i>,
-	infix_operator: FormulaInfixOperator,
-	previous_index: usize,
-}
-
-impl<'i> SplitFormulaAtInfixOperator<'i>
-{
-	pub fn new(input: &FormulaStr<'i>, infix_operator: FormulaInfixOperator)
-		-> Self
-	{
-		Self
-		{
-			infix_operator_iterator: input.iter_infix_operators(),
-			infix_operator,
-			previous_index: 0,
-		}
-	}
-}
-
-impl<'i> std::iter::Iterator for SplitFormulaAtInfixOperator<'i>
-{
-	type Item = Result<&'i str, crate::parse::Error>;
-
-	fn next(&mut self) -> Option<Self::Item>
-	{
-		loop
-		{
-			let (input_left, input_right, infix_operator) =
-				match self.infix_operator_iterator.next()
-			{
-				Some(Err(error)) => return Some(Err(error)),
-				Some(Ok(infix_operator_iterator_next)) => infix_operator_iterator_next,
-				None => break,
-			};
-
-			if infix_operator == self.infix_operator
-			{
-				// TODO: refactor
-				let index = input_left.as_ptr() as usize
-					+ input_left.len()
-					- self.infix_operator_iterator.original_input.as_ptr() as usize;
-				let split_input = &self.infix_operator_iterator
-					.original_input[self.previous_index..index].trim();
-				self.previous_index = input_right.as_ptr() as usize
-					- self.infix_operator_iterator.original_input.as_ptr() as usize;
-
-				return Some(Ok(split_input));
-			}
-		}
-
-		let remaining_input = self.infix_operator_iterator
-			.original_input[self.previous_index..].trim();
-
-		if remaining_input.is_empty()
-		{
-			None
-		}
-		else
-		{
-			self.previous_index = self.infix_operator_iterator.original_input.len();
-
-			Some(Ok(remaining_input))
-		}
-	}
-}
+}*/
 
 #[cfg(test)]
 mod tests

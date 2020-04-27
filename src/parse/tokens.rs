@@ -1,3 +1,37 @@
+fn substring_offset(substring: &str, string: &str) -> usize
+{
+	substring.as_ptr() as usize - string.as_ptr() as usize
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum Keyword
+{
+	And,
+	Exists,
+	False,
+	ForAll,
+	Not,
+	Or,
+	True,
+}
+
+impl std::fmt::Debug for Keyword
+{
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		match &self
+		{
+			Self::And => write!(formatter, "and"),
+			Self::Exists => write!(formatter, "exists"),
+			Self::False => write!(formatter, "false"),
+			Self::ForAll => write!(formatter, "forall"),
+			Self::Not => write!(formatter, "not"),
+			Self::Or => write!(formatter, "or"),
+			Self::True => write!(formatter, "true"),
+		}
+	}
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Symbol
 {
@@ -15,6 +49,7 @@ pub(crate) enum Symbol
 	Minus,
 	Multiplication,
 	NotEqual,
+	Percent,
 	Plus,
 	VerticalBar,
 }
@@ -39,15 +74,24 @@ impl std::fmt::Debug for Symbol
 			Self::Minus => write!(formatter, "-"),
 			Self::Multiplication => write!(formatter, "*"),
 			Self::NotEqual => write!(formatter, "!="),
+			Self::Percent => write!(formatter, "%"),
 			Self::Plus => write!(formatter, "+"),
 			Self::VerticalBar => write!(formatter, "|"),
 		}
 	}
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum Token<'i>
+{
+	Identifier(&'i str),
+	Number(usize),
+	ParenthesizedExpression(&'i str),
+	Symbol(Symbol),
+}
+
 fn is_identifier_start_character(character: char) -> bool
 {
-	// TODO: support leading underscores
 	character.is_ascii_alphabetic()
 }
 
@@ -65,13 +109,17 @@ pub(crate) fn identifier(input: &str) -> Option<(&str, &str)>
 {
 	let mut characters = input.char_indices();
 
-	let (_, character) = match characters.next()
+	let first_character = loop
 	{
-		Some(characters_next) => characters_next,
-		None => return None,
-	};
+		match characters.next()
+		{
+			Some((_, '_')) => continue,
+			Some((_, character)) => break Some(character),
+			None => break None,
+		}
+	}?;
 
-	if !is_identifier_start_character(character)
+	if !is_identifier_start_character(first_character)
 	{
 		return None;
 	}
@@ -89,6 +137,21 @@ pub(crate) fn identifier(input: &str) -> Option<(&str, &str)>
 				}
 			},
 		}
+	}
+}
+
+pub(crate) fn is_keyword(identifier: &str) -> bool
+{
+	match identifier
+	{
+		"and"
+		| "exists"
+		| "false"
+		| "forall"
+		| "not"
+		| "or"
+		| "true" => true,
+		_ => false,
 	}
 }
 
@@ -196,6 +259,7 @@ pub(crate) fn symbol(input: &str) -> Option<(Symbol, &str)>
 			_ => Some((Symbol::Multiplication, remaining_input)),
 		},
 		'/' => Some((Symbol::Division, remaining_input)),
+		'%' => Some((Symbol::Percent, remaining_input)),
 		'|' => Some((Symbol::VerticalBar, remaining_input)),
 		_ => None,
 	}
@@ -244,10 +308,220 @@ pub(crate) fn parenthesized_expression(input: &str)
 		crate::parse::error::Location::new(0, Some(1))))
 }
 
+pub(crate) trait OriginalInput<'i>
+{
+	fn original_input(&self) -> &'i str;
+}
+
+pub(crate) struct TokenIterator<'i>
+{
+	original_input: &'i str,
+	input: &'i str,
+}
+
+impl<'i> TokenIterator<'i>
+{
+	pub fn new(input: &'i str) -> Self
+	{
+		Self
+		{
+			original_input: input,
+			input,
+		}
+	}
+
+	/*pub fn filter<P>(self, pattern: P) -> TokenFilter<'i, P>
+	where
+		P: FnMut(&Token<'i>) -> bool,
+	{
+		TokenFilter::new(self, pattern)
+	}
+
+	pub fn split(self) -> TokenSplit<'i, Self>
+	{
+		TokenSplit::new(self)
+	}*/
+}
+
+/*impl<'i> OriginalInput<'i> for TokenIterator<'i>
+{
+	fn original_input(&self) -> &'i str
+	{
+		self.original_input
+	}
+}
+
+impl<'i, P> OriginalInput<'i> for std::iter::Filter<TokenIterator<'i>, P>
+{
+	fn original_input(&self) -> &'i str
+	{
+		self.iter.original_input
+	}
+}*/
+
+impl<'i> std::iter::Iterator for TokenIterator<'i>
+{
+	type Item = Result<(usize, usize, Token<'i>), crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		self.input = self.input.trim_start();
+		let index_left = substring_offset(self.input, self.original_input);
+
+		let first_character = match self.input.chars().next()
+		{
+			None => return None,
+			Some(first_character) => first_character,
+		};
+
+		if self.input.starts_with(")")
+		{
+			return Some(Err(crate::parse::Error::new_unmatched_parenthesis(
+				crate::parse::error::Location::new(0, Some(1)))));
+		}
+
+		match parenthesized_expression(self.input)
+		{
+			Ok(Some((parenthesized_expression, remaining_input))) =>
+			{
+				self.input = remaining_input;
+				let index_right = substring_offset(self.input, self.original_input);
+
+				return Some(Ok((index_left, index_right,
+					Token::ParenthesizedExpression(parenthesized_expression))));
+			},
+			Ok(None) => (),
+			Err(error) => return Some(Err(error)),
+		}
+
+		match number(self.input)
+		{
+			Ok(Some((number, remaining_input))) =>
+			{
+				self.input = remaining_input;
+				let index_right = substring_offset(self.input, self.original_input);
+
+				return Some(Ok((index_left, index_right, Token::Number(number))));
+			},
+			Ok(None) => (),
+			Err(error) => return Some(Err(error)),
+		}
+
+		if let Some((identifier, remaining_input)) = identifier(self.input)
+		{
+			self.input = remaining_input;
+			let index_right = substring_offset(self.input, self.original_input);
+
+			return Some(Ok((index_left, index_right, Token::Identifier(identifier))));
+		}
+
+		if let Some((symbol, remaining_input)) = symbol(self.input)
+		{
+			self.input = remaining_input;
+			let index_right = substring_offset(self.input, self.original_input);
+
+			return Some(Ok((index_left, index_right, Token::Symbol(symbol))));
+		}
+
+		return Some(Err(crate::parse::Error::new_character_not_allowed(first_character,
+			crate::parse::error::Location::new(0, Some(0)))));
+	}
+}
+
+pub(crate) struct TokenSplit<'i, T, U>
+where
+	T: std::iter::Iterator<Item = Result<(usize, usize, U), crate::parse::Error>>
+{
+	token_iterator: T,
+	original_input: &'i str,
+	previous_index: usize,
+}
+
+impl<'i, T, U> TokenSplit<'i, T, U>
+where
+	T: std::iter::Iterator<Item = Result<(usize, usize, U), crate::parse::Error>>
+{
+	pub fn new(token_iterator: T, original_input: &'i str) -> Self
+	{
+		Self
+		{
+			token_iterator,
+			original_input,
+			previous_index: 0,
+		}
+	}
+}
+
+impl<'i, T, U> std::iter::Iterator for TokenSplit<'i, T, U>
+where
+	T: std::iter::Iterator<Item = Result<(usize, usize, U), crate::parse::Error>>
+{
+	type Item = Result<&'i str, crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		if self.previous_index == self.original_input.len()
+		{
+			return None;
+		}
+
+		loop
+		{
+			match self.token_iterator.next()
+			{
+				Some(Ok((index_left, index_right, token))) =>
+				{
+					let input_between = self.original_input[self.previous_index..index_left].trim();
+
+					assert!(!input_between.is_empty());
+
+					self.previous_index = index_right;
+
+					return Some(Ok(input_between));
+				},
+				Some(Err(error)) => return Some(Err(error)),
+				None =>
+				{
+					let remaining_input = self.original_input[self.previous_index..].trim();
+
+					self.previous_index = self.original_input.len();
+
+					return Some(Ok(remaining_input));
+				},
+			}
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests
 {
 	use super::*;
+
+	#[test]
+	fn tokenize_identifier()
+	{
+		assert_eq!(identifier("test").unwrap(), ("test", ""));
+		assert_eq!(identifier("test2").unwrap(), ("test2", ""));
+		assert_eq!(identifier("Test").unwrap(), ("Test", ""));
+		assert_eq!(identifier("Test2").unwrap(), ("Test2", ""));
+		assert_eq!(identifier("_test").unwrap(), ("_test", ""));
+		assert_eq!(identifier("_test2").unwrap(), ("_test2", ""));
+		assert_eq!(identifier("__test").unwrap(), ("__test", ""));
+		assert_eq!(identifier("__test2").unwrap(), ("__test2", ""));
+		assert_eq!(identifier("test, test").unwrap(), ("test", ", test"));
+		assert_eq!(identifier("test2, test").unwrap(), ("test2", ", test"));
+		assert_eq!(identifier("Test, Test").unwrap(), ("Test", ", Test"));
+		assert_eq!(identifier("Test2, Test").unwrap(), ("Test2", ", Test"));
+		assert_eq!(identifier("_test, _test").unwrap(), ("_test", ", _test"));
+		assert_eq!(identifier("_test2, _test").unwrap(), ("_test2", ", _test"));
+		assert_eq!(identifier("__test, __test").unwrap(), ("__test", ", __test"));
+		assert_eq!(identifier("__test2, __test").unwrap(), ("__test2", ", __test"));
+		assert!(identifier("2test, test").is_none());
+		assert!(identifier("#test, test").is_none());
+		assert!(identifier("$test, test").is_none());
+		assert!(identifier(",test, test").is_none());
+	}
 
 	#[test]
 	fn tokenize_primitives()

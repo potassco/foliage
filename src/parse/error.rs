@@ -24,6 +24,12 @@ pub enum Kind
 	CharacterNotAllowed(char),
 	ParseNumber(String),
 	MixedImplicationDirections(Location),
+	ExpectedVariableDeclaration,
+	UnexpectedToken,
+	EmptyInput,
+	ExpectedLogicalConnectiveArgument(String),
+	ExpectedComparisonArgument(String),
+	MultipleComparisonOperators(crate::ComparisonOperator, crate::ComparisonOperator),
 }
 
 pub struct Error
@@ -73,6 +79,43 @@ impl Error
 	{
 		Self::new(Kind::MixedImplicationDirections(location_2), location_1)
 	}
+
+	pub(crate) fn new_expected_variable_declaration(location: Location) -> Self
+	{
+		Self::new(Kind::ExpectedVariableDeclaration, location)
+	}
+
+	pub(crate) fn new_unexpected_token(location: Location) -> Self
+	{
+		Self::new(Kind::UnexpectedToken, location)
+	}
+
+	pub(crate) fn new_empty_input(location: Location) -> Self
+	{
+		Self::new(Kind::EmptyInput, location)
+	}
+
+	pub(crate) fn new_expected_logical_connective_argument(logical_connective_name: String,
+		location: Location)
+		-> Self
+	{
+		Self::new(Kind::ExpectedLogicalConnectiveArgument(logical_connective_name), location)
+	}
+
+	pub(crate) fn new_comparison_argument(comparison_operator_name: String, location: Location)
+		-> Self
+	{
+		Self::new(Kind::ExpectedComparisonArgument(comparison_operator_name), location)
+	}
+
+	pub(crate) fn new_multiple_comparison_operators(
+		comparison_operator_1: crate::ComparisonOperator,
+		comparison_operator_2: crate::ComparisonOperator, location: Location)
+		-> Self
+	{
+		Self::new(Kind::MultipleComparisonOperators(comparison_operator_1, comparison_operator_2),
+			location)
+	}
 }
 
 impl std::fmt::Debug for Error
@@ -97,6 +140,19 @@ impl std::fmt::Debug for Error
 			// TODO: print second location properly
 			Kind::MixedImplicationDirections(_location_2) =>
 				write!(formatter, "-> and <- implications may not be mixed within the same scope")?,
+			Kind::ExpectedVariableDeclaration =>
+				write!(formatter, "expected variable declaration")?,
+			Kind::UnexpectedToken => write!(formatter, "unexpected token")?,
+			Kind::EmptyInput => write!(formatter, "empty input")?,
+			Kind::ExpectedLogicalConnectiveArgument(ref logical_connective_name) =>
+				write!(formatter, "this “{}” logical connective is missing an argument",
+					logical_connective_name)?,
+			Kind::ExpectedComparisonArgument(ref comparison_operator_name) =>
+				write!(formatter, "this “{}” comparison is missing an argument",
+					comparison_operator_name)?,
+			Kind::MultipleComparisonOperators(comparison_operator_1, comparison_operator_2) =>
+				write!(formatter, "chained comparisons aren’t supported (found “{:?}” and “{:?}” in the same formula), consider separating them with “and”",
+					comparison_operator_1, comparison_operator_2)?,
 		}
 
 		if let Some(source) = &self.source

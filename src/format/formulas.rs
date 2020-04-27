@@ -1,5 +1,23 @@
 use super::terms::*;
 
+impl std::fmt::Debug for crate::ComparisonOperator
+{
+	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
+	{
+		let operator_symbol = match self
+		{
+			Self::Less => "<",
+			Self::LessOrEqual => "<=",
+			Self::Greater => ">",
+			Self::GreaterOrEqual => ">=",
+			Self::Equal => "=",
+			Self::NotEqual => "!=",
+		};
+
+		write!(formatter, "{}", operator_symbol)
+	}
+}
+
 impl std::fmt::Debug for crate::ImplicationDirection
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
