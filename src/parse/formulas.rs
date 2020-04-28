@@ -209,7 +209,7 @@ impl<'i> FormulaStr<'i>
 			{
 				// TODO: improve error handling if the formulas between the operators are invalid
 				self.split_at_logical_connective(top_level_logical_connective)
-					.map(|subformula| FormulaStr::new(subformula?).parse(level + 1))
+					.map(|argument| FormulaStr::new(argument?).parse(level + 1))
 					.collect::<Result<Vec<_>, _>>()
 			};
 
