@@ -352,18 +352,18 @@ impl std::fmt::Debug for Quantifier
 }
 
 // TODO: refactor
-fn implication_left_to_right_inner<'i, T>(mut logical_connective_iterator: T, level: usize)
+fn implication_left_to_right_inner<'i, T>(mut argument_iterator: T, level: usize)
 	-> Result<Option<crate::Formula>, crate::parse::Error>
 where
 	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 {
-	match logical_connective_iterator.next()
+	match argument_iterator.next()
 	{
 		Some(argument) =>
 		{
 			// TODO: improve error handling if antecedent cannot be parsed
 			let argument = FormulaStr::new(argument?).parse(level)?;
-			match implication_left_to_right_inner(logical_connective_iterator, level)?
+			match implication_left_to_right_inner(argument_iterator, level)?
 			{
 				Some(next_argument) => Ok(Some(crate::Formula::implies(
 					crate::ImplicationDirection::LeftToRight, Box::new(argument),
@@ -375,18 +375,18 @@ where
 	}
 }
 
-fn implication_left_to_right<'i, T>(mut logical_connective_iterator: T, level: usize)
+fn implication_left_to_right<'i, T>(mut argument_iterator: T, level: usize)
 	-> Result<crate::Formula, crate::parse::Error>
 where
 	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 {
-	match logical_connective_iterator.next()
+	match argument_iterator.next()
 	{
 		Some(argument) =>
 		{
 			// TODO: improve error handling if antecedent cannot be parsed
 			let argument = FormulaStr::new(argument?).parse(level)?;
-			match implication_left_to_right_inner(logical_connective_iterator, level)?
+			match implication_left_to_right_inner(argument_iterator, level)?
 			{
 				Some(next_argument) => Ok(crate::Formula::implies(
 					crate::ImplicationDirection::LeftToRight, Box::new(argument),
