@@ -4,10 +4,7 @@ use super::tokens::*;
 pub fn formula(input: &str) -> Result<crate::Formula, crate::parse::Error>
 {
 	let formula_str = FormulaStr::new(input);
-	formula_str.parse(0)?;
-
-	// TODO: implement correctly
-	Ok(crate::Formula::true_())
+	formula_str.parse(0)
 }
 
 pub(crate) fn predicate_name(identifier: &str) -> Option<(&str, &str)>
@@ -197,7 +194,7 @@ impl<'i> FormulaStr<'i>
 		{
 			Some(')') => return Err(crate::parse::Error::new_unmatched_parenthesis(
 				crate::parse::error::Location::new(0, Some(0)))),
-			None => return Err(crate::parse::Error::new_empty_input(
+			None => return Err(crate::parse::Error::new_empty_expression(
 				crate::parse::error::Location::new(0, Some(0)))),
 			_ => (),
 		}
@@ -250,6 +247,16 @@ impl<'i> FormulaStr<'i>
 		// Parse quantified formulas
 		if let Some((identifier, input)) = identifier(input)
 		{
+			if identifier == "not"
+			{
+				let input = input.trim_start();
+				println!("{}  parsing “not” formula body: {}", indentation, input);
+
+				let argument = FormulaStr::new(input).parse(level + 1)?;
+
+				return Ok(crate::Formula::not(Box::new(argument)));
+			}
+
 			let quantifier = match identifier
 			{
 				"exists" => Some(Quantifier::Existential),
@@ -291,6 +298,7 @@ impl<'i> FormulaStr<'i>
 			// Hence, the split is guaranteed to generate exactly these two elements
 			let input_left = comparison_operator_split.next().unwrap()?;
 			let input_right = comparison_operator_split.next().unwrap()?;
+			assert!(comparison_operator_split.next().is_none());
 
 			let argument_left = TermStr::new(input_left).parse(level + 1)?;
 			let argument_right = TermStr::new(input_right).parse(level + 1)?;
@@ -302,47 +310,59 @@ impl<'i> FormulaStr<'i>
 		// Parse predicates
 		if let Some((predicate_name, input)) = predicate_name(input)
 		{
-			println!("{}  TODO: parse predicate {}", indentation, predicate_name);
+			println!("{}  parsing predicate {}", indentation, predicate_name);
 
 			let input = input.trim_start();
 
 			// Parse arguments if there are any
-			/*let arguments = match parenthesized_expression(input)?
+			let (arguments, input) = match parenthesized_expression(input)?
 			{
-				Some((parenthesized_expression, remaining_input)) =>
+				Some((parenthesized_expression, input)) =>
 				{
-					unimplemented!();
-				}
-				None => unimplemented!(),
-			};*/
+					let functor = |token: &_| *token == Token::Symbol(Symbol::Comma);
+					let arguments = Tokens::new_filter(parenthesized_expression, functor).split()
+						.map(|argument| TermStr::new(argument?).parse(level + 1))
+						.collect::<Result<_, _>>()?;
 
-			// TODO: implement correctly
-			return Ok(crate::Formula::true_());
+					(arguments, input)
+				}
+				None => (vec![], input),
+			};
+
+			if !input.trim().is_empty()
+			{
+				return Err(crate::parse::Error::new_unexpected_token(
+					crate::parse::error::Location::new(0, Some(0))))
+			}
+
+			// TODO: implement look-up
+			let declaration =
+				crate::PredicateDeclaration::new(predicate_name.to_string(), arguments.len());
+			let declaration = std::rc::Rc::new(declaration);
+
+			// TODO: handle unexpected input after end of parenthesized expression
+
+			return Ok(crate::Formula::predicate(declaration, arguments));
 		}
 
 		// Parse parenthesized formulas
-		if let Some('(') = input.chars().next()
+		match parenthesized_expression(input)?
 		{
-			match parenthesized_expression(input)?
+			Some((parenthesized_expression, input)) =>
 			{
-				Some((parenthesized_expression, remaining_input)) =>
+				if !input.trim().is_empty()
 				{
-					if !remaining_input.trim().is_empty()
-					{
-						return Err(crate::parse::Error::new_unexpected_token(
-							crate::parse::error::Location::new(0, Some(0))));
-					}
+					return Err(crate::parse::Error::new_unexpected_token(
+						crate::parse::error::Location::new(0, Some(0))));
+				}
 
-					return FormulaStr::new(parenthesized_expression).parse(level);
-				},
-				None => unreachable!(),
-			}
-		};
+				return FormulaStr::new(parenthesized_expression).parse(level);
+			},
+			None => (),
+		}
 
-		println!("{}  can’t break down formula any further: {}", indentation, input);
-
-		// TODO: implement correctly
-		Ok(crate::Formula::true_())
+		Err(crate::parse::Error::new_unexpected_token(
+			crate::parse::error::Location::new(0, Some(0))))
 	}
 }
 

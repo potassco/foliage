@@ -26,7 +26,7 @@ pub enum Kind
 	MixedImplicationDirections(Location),
 	ExpectedVariableDeclaration,
 	UnexpectedToken,
-	EmptyInput,
+	EmptyExpression,
 	ExpectedLogicalConnectiveArgument(String),
 	MultipleComparisonOperators(crate::ComparisonOperator, crate::ComparisonOperator),
 }
@@ -89,9 +89,9 @@ impl Error
 		Self::new(Kind::UnexpectedToken, location)
 	}
 
-	pub(crate) fn new_empty_input(location: Location) -> Self
+	pub(crate) fn new_empty_expression(location: Location) -> Self
 	{
-		Self::new(Kind::EmptyInput, location)
+		Self::new(Kind::EmptyExpression, location)
 	}
 
 	pub(crate) fn new_expected_logical_connective_argument(logical_connective_name: String,
@@ -136,7 +136,7 @@ impl std::fmt::Debug for Error
 			Kind::ExpectedVariableDeclaration =>
 				write!(formatter, "expected variable declaration")?,
 			Kind::UnexpectedToken => write!(formatter, "unexpected token")?,
-			Kind::EmptyInput => write!(formatter, "empty input")?,
+			Kind::EmptyExpression => write!(formatter, "empty expression")?,
 			Kind::ExpectedLogicalConnectiveArgument(ref logical_connective_name) =>
 				write!(formatter, "this “{}” logical connective is missing an argument",
 					logical_connective_name)?,

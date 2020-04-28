@@ -3,10 +3,7 @@ use super::tokens::*;
 pub fn parse_term(input: &str) -> Result<crate::Term, crate::parse::Error>
 {
 	let term_str = TermStr::new(input);
-	term_str.parse(0)?;
-
-	// TODO: implement correctly
-	Ok(crate::Term::true_())
+	term_str.parse(0)
 }
 
 pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
