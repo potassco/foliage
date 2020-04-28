@@ -68,28 +68,15 @@ impl<'i> FormulaStr<'i>
 		}
 	}
 
-	fn tokens(&self) -> Tokens<'i, impl FnMut(Token<'i>) -> Option<Token<'i>>>
-	{
-		Tokens::new_iter(self.input)
-	}
-
 	fn logical_connectives(&self) -> Tokens<'i, impl FnMut(Token<'i>) -> Option<LogicalConnective>>
 	{
 		let functor = |token| match token
 		{
-			Token::Identifier(ref identifier) => match *identifier
-			{
-				"and" => Some(LogicalConnective::And),
-				"or" => Some(LogicalConnective::Or),
-				_ => None,
-			},
-			Token::Symbol(ref symbol) => match symbol
-			{
-				Symbol::ArrowLeft => Some(LogicalConnective::ImpliesRightToLeft),
-				Symbol::ArrowLeftAndRight => Some(LogicalConnective::IfAndOnlyIf),
-				Symbol::ArrowRight => Some(LogicalConnective::ImpliesLeftToRight),
-				_ => None,
-			},
+			Token::Identifier("and") => Some(LogicalConnective::And),
+			Token::Identifier("or") => Some(LogicalConnective::Or),
+			Token::Symbol(Symbol::ArrowLeft) => Some(LogicalConnective::ImpliesRightToLeft),
+			Token::Symbol(Symbol::ArrowLeftAndRight) => Some(LogicalConnective::IfAndOnlyIf),
+			Token::Symbol(Symbol::ArrowRight) => Some(LogicalConnective::ImpliesLeftToRight),
 			_ => None,
 		};
 
@@ -101,19 +88,14 @@ impl<'i> FormulaStr<'i>
 	{
 		let predicate = move |token: &_| match token
 		{
-			Token::Identifier(ref identifier) => match *identifier
-			{
-				"and" => logical_connective == LogicalConnective::And,
-				"or" => logical_connective == LogicalConnective::Or,
-				_ => false,
-			},
-			Token::Symbol(ref symbol) => match symbol
-			{
-				Symbol::ArrowLeft => logical_connective == LogicalConnective::ImpliesRightToLeft,
-				Symbol::ArrowLeftAndRight => logical_connective == LogicalConnective::IfAndOnlyIf,
-				Symbol::ArrowRight => logical_connective == LogicalConnective::ImpliesLeftToRight,
-				_ => false,
-			},
+			Token::Identifier("and") => logical_connective == LogicalConnective::And,
+			Token::Identifier("or") => logical_connective == LogicalConnective::Or,
+			Token::Symbol(Symbol::ArrowLeft) =>
+				logical_connective == LogicalConnective::ImpliesRightToLeft,
+			Token::Symbol(Symbol::ArrowLeftAndRight) =>
+				logical_connective == LogicalConnective::IfAndOnlyIf,
+			Token::Symbol(Symbol::ArrowRight) =>
+				logical_connective == LogicalConnective::ImpliesLeftToRight,
 			_ => false,
 		};
 
@@ -247,14 +229,38 @@ impl<'i> FormulaStr<'i>
 		// Parse quantified formulas
 		if let Some((identifier, input)) = identifier(input)
 		{
-			if identifier == "not"
+			match identifier
 			{
-				let input = input.trim_start();
-				println!("{}  parsing “not” formula body: {}", indentation, input);
+				"not" =>
+				{
+					let input = input.trim_start();
+					println!("{}  parsing “not” formula body: {}", indentation, input);
 
-				let argument = FormulaStr::new(input).parse(level + 1)?;
+					let argument = FormulaStr::new(input).parse(level + 1)?;
 
-				return Ok(crate::Formula::not(Box::new(argument)));
+					return Ok(crate::Formula::not(Box::new(argument)));
+				},
+				"true" =>
+				{
+					if !input.trim().is_empty()
+					{
+						return Err(crate::parse::Error::new_unexpected_token(
+							crate::parse::error::Location::new(0, Some(0))))
+					}
+
+					return Ok(crate::Formula::true_());
+				},
+				"false" =>
+				{
+					if !input.trim().is_empty()
+					{
+						return Err(crate::parse::Error::new_unexpected_token(
+							crate::parse::error::Location::new(0, Some(0))))
+					}
+
+					return Ok(crate::Formula::false_());
+				},
+				_ => (),
 			}
 
 			let quantifier = match identifier
@@ -340,25 +346,19 @@ impl<'i> FormulaStr<'i>
 				crate::PredicateDeclaration::new(predicate_name.to_string(), arguments.len());
 			let declaration = std::rc::Rc::new(declaration);
 
-			// TODO: handle unexpected input after end of parenthesized expression
-
 			return Ok(crate::Formula::predicate(declaration, arguments));
 		}
 
 		// Parse parenthesized formulas
-		match parenthesized_expression(input)?
+		if let Some((parenthesized_expression, input)) = parenthesized_expression(input)?
 		{
-			Some((parenthesized_expression, input)) =>
+			if !input.trim().is_empty()
 			{
-				if !input.trim().is_empty()
-				{
-					return Err(crate::parse::Error::new_unexpected_token(
-						crate::parse::error::Location::new(0, Some(0))));
-				}
+				return Err(crate::parse::Error::new_unexpected_token(
+					crate::parse::error::Location::new(0, Some(0))));
+			}
 
-				return FormulaStr::new(parenthesized_expression).parse(level);
-			},
-			None => (),
+			return FormulaStr::new(parenthesized_expression).parse(level + 1);
 		}
 
 		Err(crate::parse::Error::new_unexpected_token(

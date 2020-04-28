@@ -28,6 +28,7 @@ pub enum Kind
 	UnexpectedToken,
 	EmptyExpression,
 	ExpectedLogicalConnectiveArgument(String),
+	ExpectedTerm,
 	MultipleComparisonOperators(crate::ComparisonOperator, crate::ComparisonOperator),
 }
 
@@ -101,6 +102,11 @@ impl Error
 		Self::new(Kind::ExpectedLogicalConnectiveArgument(logical_connective_name), location)
 	}
 
+	pub(crate) fn new_expected_term(location: Location) -> Self
+	{
+		Self::new(Kind::ExpectedTerm, location)
+	}
+
 	pub(crate) fn new_multiple_comparison_operators(
 		comparison_operator_1: crate::ComparisonOperator,
 		comparison_operator_2: crate::ComparisonOperator, location: Location)
@@ -134,12 +140,13 @@ impl std::fmt::Debug for Error
 			Kind::MixedImplicationDirections(_location_2) =>
 				write!(formatter, "-> and <- implications may not be mixed within the same scope")?,
 			Kind::ExpectedVariableDeclaration =>
-				write!(formatter, "expected variable declaration")?,
+				write!(formatter, "expected a variable declaration")?,
 			Kind::UnexpectedToken => write!(formatter, "unexpected token")?,
 			Kind::EmptyExpression => write!(formatter, "empty expression")?,
 			Kind::ExpectedLogicalConnectiveArgument(ref logical_connective_name) =>
 				write!(formatter, "this “{}” logical connective is missing an argument",
 					logical_connective_name)?,
+			Kind::ExpectedTerm => write!(formatter, "expected a term")?,
 			Kind::MultipleComparisonOperators(comparison_operator_1, comparison_operator_2) =>
 				write!(formatter, "chained comparisons aren’t supported (found “{:?}” and “{:?}” in the same formula), consider separating them with “and”",
 					comparison_operator_1, comparison_operator_2)?,

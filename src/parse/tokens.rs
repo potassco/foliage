@@ -10,8 +10,10 @@ pub(crate) enum Keyword
 	Exists,
 	False,
 	ForAll,
+	Infimum,
 	Not,
 	Or,
+	Supremum,
 	True,
 }
 
@@ -25,8 +27,10 @@ impl std::fmt::Debug for Keyword
 			Self::Exists => write!(formatter, "exists"),
 			Self::False => write!(formatter, "false"),
 			Self::ForAll => write!(formatter, "forall"),
+			Self::Infimum => write!(formatter, "inf"),
 			Self::Not => write!(formatter, "not"),
 			Self::Or => write!(formatter, "or"),
+			Self::Supremum => write!(formatter, "sup"),
 			Self::True => write!(formatter, "true"),
 		}
 	}
@@ -148,8 +152,10 @@ pub(crate) fn is_keyword(identifier: &str) -> bool
 		| "exists"
 		| "false"
 		| "forall"
+		| "inf"
 		| "not"
 		| "or"
+		| "sup"
 		| "true" => true,
 		_ => false,
 	}
@@ -467,7 +473,6 @@ where
 					};
 
 					let input_left = self.original_input[self.previous_index..index_left].trim();
-					assert!(!input_left.is_empty());
 
 					self.previous_index = index_right;
 
