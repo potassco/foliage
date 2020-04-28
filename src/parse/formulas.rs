@@ -137,10 +137,13 @@ impl<'i> FormulaStr<'i>
 				None => Some(logical_connective),
 				Some(top_level_logical_connective) =>
 				{
-					if (logical_connective == LogicalConnective::ImpliesLeftToRight
-							&& top_level_logical_connective == LogicalConnective::ImpliesRightToLeft)
-						|| (logical_connective == LogicalConnective::ImpliesRightToLeft
-							&& top_level_logical_connective == LogicalConnective::ImpliesLeftToRight)
+					let implication_directions_are_mixed =
+						logical_connective == LogicalConnective::ImpliesLeftToRight
+							&& top_level_logical_connective == LogicalConnective::ImpliesRightToLeft
+						|| logical_connective == LogicalConnective::ImpliesRightToLeft
+							&& top_level_logical_connective == LogicalConnective::ImpliesLeftToRight;
+
+					if implication_directions_are_mixed
 					{
 						return Err(crate::parse::Error::new_mixed_implication_directions(
 							crate::parse::error::Location::new(0, Some(0)),
