@@ -308,12 +308,216 @@ pub(crate) fn parenthesized_expression(input: &str)
 		crate::parse::error::Location::new(0, Some(1))))
 }
 
-pub(crate) trait OriginalInput<'i>
+pub(crate) struct Tokens<'i, F>
 {
-	fn original_input(&self) -> &'i str;
+	original_input: &'i str,
+	input: &'i str,
+	previous_index: usize,
+	reached_end_of_stream: bool,
+	functor: F,
 }
 
-pub(crate) struct TokenIterator<'i>
+impl<'i> Tokens<'i, ()>
+{
+	pub fn new_iter(input: &'i str) -> Tokens<'i, impl FnMut(Token<'i>) -> Option<Token<'i>>>
+	{
+		Tokens::new_filter_map(input, |x| Some(x))
+	}
+
+	pub fn new_filter<P>(input: &'i str, mut predicate: P)
+		-> Tokens<'i, impl FnMut(Token<'i>) -> Option<Token<'i>>>
+	where
+		P: FnMut(&Token<'i>) -> bool
+	{
+		Tokens::new_filter_map(input,
+			move |x|
+			{
+				if predicate(&x)
+				{
+					Some(x)
+				}
+				else
+				{
+					None
+				}
+			})
+	}
+}
+
+impl<'i, F> Tokens<'i, F>
+{
+	pub fn new_filter_map(input: &'i str, functor: F) -> Self
+	{
+		Self
+		{
+			original_input: input,
+			input,
+			previous_index: 0,
+			reached_end_of_stream: false,
+			functor,
+		}
+	}
+
+	fn next_token(&mut self) -> Option<Result<(usize, usize, Token<'i>), crate::parse::Error>>
+	{
+		self.input = self.input.trim_start();
+		let index_left = substring_offset(self.input, self.original_input);
+
+		let first_character = match self.input.chars().next()
+		{
+			None => return None,
+			Some(first_character) => first_character,
+		};
+
+		if self.input.starts_with(")")
+		{
+			return Some(Err(crate::parse::Error::new_unmatched_parenthesis(
+				crate::parse::error::Location::new(0, Some(1)))));
+		}
+
+		match parenthesized_expression(self.input)
+		{
+			Ok(Some((parenthesized_expression, remaining_input))) =>
+			{
+				self.input = remaining_input;
+				let index_right = substring_offset(self.input, self.original_input);
+
+				return Some(Ok((index_left, index_right,
+					Token::ParenthesizedExpression(parenthesized_expression))));
+			},
+			Ok(None) => (),
+			Err(error) => return Some(Err(error)),
+		}
+
+		match number(self.input)
+		{
+			Ok(Some((number, remaining_input))) =>
+			{
+				self.input = remaining_input;
+				let index_right = substring_offset(self.input, self.original_input);
+
+				return Some(Ok((index_left, index_right, Token::Number(number))));
+			},
+			Ok(None) => (),
+			Err(error) => return Some(Err(error)),
+		}
+
+		if let Some((identifier, remaining_input)) = identifier(self.input)
+		{
+			self.input = remaining_input;
+			let index_right = substring_offset(self.input, self.original_input);
+
+			return Some(Ok((index_left, index_right, Token::Identifier(identifier))));
+		}
+
+		if let Some((symbol, remaining_input)) = symbol(self.input)
+		{
+			self.input = remaining_input;
+			let index_right = substring_offset(self.input, self.original_input);
+
+			return Some(Ok((index_left, index_right, Token::Symbol(symbol))));
+		}
+
+		return Some(Err(crate::parse::Error::new_character_not_allowed(first_character,
+			crate::parse::error::Location::new(0, Some(0)))));
+	}
+
+	pub fn remaining_input(&mut self) -> Option<&'i str>
+	{
+		if self.reached_end_of_stream
+		{
+			return None;
+		}
+
+		let remaining_input = self.original_input[self.previous_index..].trim();
+		self.reached_end_of_stream = true;
+
+		Some(remaining_input)
+	}
+
+	pub fn split(self) -> TokenSplit<Self>
+	{
+		TokenSplit::new(self)
+	}
+}
+
+impl<'i, F, G> std::iter::Iterator for Tokens<'i, F>
+where
+	F: FnMut(Token<'i>) -> Option<G>,
+{
+	type Item = Result<(&'i str, G), crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		if self.previous_index == self.original_input.len()
+		{
+			return None;
+		}
+
+		loop
+		{
+			match self.next_token()
+			{
+				Some(Ok((index_left, index_right, token))) =>
+				{
+					let token = match (self.functor)(token)
+					{
+						None => continue,
+						Some(token) => token,
+					};
+
+					let input_left = self.original_input[self.previous_index..index_left].trim();
+					assert!(!input_left.is_empty());
+
+					self.previous_index = index_right;
+
+					return Some(Ok((input_left, token)));
+				},
+				Some(Err(error)) => return Some(Err(error)),
+				None => return None,
+			}
+		}
+	}
+}
+
+pub(crate) struct TokenSplit<T>
+{
+	tokens: T,
+}
+
+impl TokenSplit<()>
+{
+	pub fn new<T>(tokens: T) -> TokenSplit<T>
+	{
+		TokenSplit
+		{
+			tokens,
+		}
+	}
+}
+
+impl<'i, F, G> std::iter::Iterator for TokenSplit<Tokens<'i, F>>
+where
+	F: FnMut(Token<'i>) -> Option<G>,
+{
+	type Item = Result<&'i str, crate::parse::Error>;
+
+	fn next(&mut self) -> Option<Self::Item>
+	{
+		match self.tokens.next()
+		{
+			Some(Ok((input_before, _))) => Some(Ok(input_before)),
+			Some(Err(error)) => Some(Err(error)),
+			None => match self.tokens.remaining_input()
+			{
+				Some(remaining_input) => Some(Ok(remaining_input)),
+				None => None,
+			},
+		}
+	}
+}
+
+/*pub(crate) struct TokenIterator<'i>
 {
 	original_input: &'i str,
 	input: &'i str,
@@ -329,35 +533,7 @@ impl<'i> TokenIterator<'i>
 			input,
 		}
 	}
-
-	/*pub fn filter<P>(self, pattern: P) -> TokenFilter<'i, P>
-	where
-		P: FnMut(&Token<'i>) -> bool,
-	{
-		TokenFilter::new(self, pattern)
-	}
-
-	pub fn split(self) -> TokenSplit<'i, Self>
-	{
-		TokenSplit::new(self)
-	}*/
 }
-
-/*impl<'i> OriginalInput<'i> for TokenIterator<'i>
-{
-	fn original_input(&self) -> &'i str
-	{
-		self.original_input
-	}
-}
-
-impl<'i, P> OriginalInput<'i> for std::iter::Filter<TokenIterator<'i>, P>
-{
-	fn original_input(&self) -> &'i str
-	{
-		self.iter.original_input
-	}
-}*/
 
 impl<'i> std::iter::Iterator for TokenIterator<'i>
 {
@@ -491,7 +667,7 @@ where
 			}
 		}
 	}
-}
+}*/
 
 #[cfg(test)]
 mod tests

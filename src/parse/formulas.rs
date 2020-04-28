@@ -71,23 +71,46 @@ impl<'i> FormulaStr<'i>
 		}
 	}
 
-	fn iter_tokens(&self) -> TokenIterator<'i>
+	fn tokens(&self) -> Tokens<'i, impl FnMut(Token<'i>) -> Option<Token<'i>>>
 	{
-		TokenIterator::new(self.input)
+		Tokens::new_iter(self.input)
 	}
 
-	fn filter_logical_connective(&self, logical_connective: LogicalConnective)
-		-> std::iter::Filter<TokenIterator<'i>, impl FnMut(&Result<(usize, usize, Token<'i>), crate::parse::Error>) -> bool>
+	fn logical_connectives(&self) -> Tokens<'i, impl FnMut(Token<'i>) -> Option<LogicalConnective>>
 	{
-		let token_selector = move |token: &_| match token
+		let functor = |token| match token
 		{
-			Ok((_, _, Token::Identifier(ref identifier))) => match *identifier
+			Token::Identifier(ref identifier) => match *identifier
+			{
+				"and" => Some(LogicalConnective::And),
+				"or" => Some(LogicalConnective::Or),
+				_ => None,
+			},
+			Token::Symbol(ref symbol) => match symbol
+			{
+				Symbol::ArrowLeft => Some(LogicalConnective::ImpliesRightToLeft),
+				Symbol::ArrowLeftAndRight => Some(LogicalConnective::IfAndOnlyIf),
+				Symbol::ArrowRight => Some(LogicalConnective::ImpliesLeftToRight),
+				_ => None,
+			},
+			_ => None,
+		};
+
+		Tokens::new_filter_map(self.input, functor)
+	}
+
+	fn split_at_logical_connective(&self, logical_connective: LogicalConnective)
+		-> TokenSplit<Tokens<'i, impl FnMut(Token<'i>) -> Option<Token<'i>>>>
+	{
+		let predicate = move |token: &_| match token
+		{
+			Token::Identifier(ref identifier) => match *identifier
 			{
 				"and" => logical_connective == LogicalConnective::And,
 				"or" => logical_connective == LogicalConnective::Or,
 				_ => false,
 			},
-			Ok((_, _, Token::Symbol(ref symbol))) => match symbol
+			Token::Symbol(ref symbol) => match symbol
 			{
 				Symbol::ArrowLeft => logical_connective == LogicalConnective::ImpliesRightToLeft,
 				Symbol::ArrowLeftAndRight => logical_connective == LogicalConnective::IfAndOnlyIf,
@@ -97,7 +120,7 @@ impl<'i> FormulaStr<'i>
 			_ => false,
 		};
 
-		self.iter_tokens().filter(token_selector)
+		Tokens::new_filter(self.input, predicate).split()
 	}
 
 	pub fn top_level_logical_connective(&self)
@@ -121,16 +144,13 @@ impl<'i> FormulaStr<'i>
 			_ => None,
 		};
 
+		let logical_connectives = Tokens::new_filter_map(self.input, logical_connective);
+
 		let mut top_level_logical_connective = None;
 
-		for token in self.iter_tokens()
+		for logical_connective in logical_connectives
 		{
-			let (_, _, token) = token?;
-			let logical_connective = match logical_connective(token)
-			{
-				Some(logical_connective) => logical_connective,
-				None => continue,
-			};
+			let (_, logical_connective) = logical_connective?;
 
 			top_level_logical_connective = match top_level_logical_connective
 			{
@@ -162,39 +182,25 @@ impl<'i> FormulaStr<'i>
 		Ok(top_level_logical_connective)
 	}
 
-	fn filter_comparison_operators(&self)
-		-> std::iter::FilterMap<TokenIterator<'i>, impl FnMut(Result<(usize, usize, Token<'i>), crate::parse::Error>)
-			-> Option<Result<(usize, usize, crate::ComparisonOperator), crate::parse::Error>>>
+	fn comparison_operators(&self) -> Tokens<'i, impl FnMut(Token<'i>)
+		-> Option<crate::ComparisonOperator>>
 	{
-		let token_functor = |token| match token
+		let functor = |token| match token
 		{
-			Ok((input_left, remaining_input, Token::Symbol(symbol))) => match symbol
+			Token::Symbol(symbol) => match symbol
 			{
-				Symbol::Greater =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::Greater))),
-				Symbol::GreaterOrEqual =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::GreaterOrEqual))),
-				Symbol::Less =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::Less))),
-				Symbol::LessOrEqual =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::LessOrEqual))),
-				Symbol::Equal =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::Equal))),
-				Symbol::NotEqual =>
-					return Some(Ok((input_left, remaining_input,
-						crate::ComparisonOperator::NotEqual))),
+				Symbol::Greater => Some(crate::ComparisonOperator::Greater),
+				Symbol::GreaterOrEqual => Some(crate::ComparisonOperator::GreaterOrEqual),
+				Symbol::Less => Some(crate::ComparisonOperator::Less),
+				Symbol::LessOrEqual => Some(crate::ComparisonOperator::LessOrEqual),
+				Symbol::Equal => Some(crate::ComparisonOperator::Equal),
+				Symbol::NotEqual => Some(crate::ComparisonOperator::NotEqual),
 				_ => None,
 			},
-			Err(error) => Some(Err(error)),
 			_ => None,
 		};
 
-		self.iter_tokens().filter_map(token_functor)
+		Tokens::new_filter_map(self.input, functor)
 	}
 
 	pub fn parse(&self, level: usize) -> Result<crate::Formula, crate::parse::Error>
@@ -222,8 +228,7 @@ impl<'i> FormulaStr<'i>
 			let arguments_n_ary = ||
 			{
 				// TODO: improve error handling if the formulas between the operators are invalid
-				TokenSplit::new(self.filter_logical_connective(top_level_logical_connective),
-					self.input)
+				self.split_at_logical_connective(top_level_logical_connective)
 					.map(|subformula| FormulaStr::new(subformula?).parse(level + 1))
 					.collect::<Result<Vec<_>, _>>()
 			};
@@ -236,10 +241,7 @@ impl<'i> FormulaStr<'i>
 					return Ok(crate::Formula::if_and_only_if(arguments_n_ary()?)),
 				LogicalConnective::ImpliesLeftToRight =>
 					return implication_left_to_right(
-						TokenSplit::new(
-							self.filter_logical_connective(top_level_logical_connective),
-							self.input),
-						level + 1),
+						self.split_at_logical_connective(top_level_logical_connective), level + 1),
 				/*LogicalConnective::ImpliesRightToLeft => unimplemented!(),*/
 				_ =>
 				{
@@ -270,17 +272,17 @@ impl<'i> FormulaStr<'i>
 			}
 		}
 
-		let mut comparison_operators = self.filter_comparison_operators();
+		let mut comparison_operators = self.comparison_operators();
 
 		// Parse comparisons
 		if let Some(comparison_operator) = comparison_operators.next()
 		{
-			let (_, _, comparison_operator) = comparison_operator?;
+			let (_, comparison_operator) = comparison_operator?;
 
 			// Comparisons with more than one comparison operator aren’t supported
 			if let Some(next_comparison_operator) = comparison_operators.next()
 			{
-				let (_, _, next_comparison_operator) = next_comparison_operator?;
+				let (_, next_comparison_operator) = next_comparison_operator?;
 
 				return Err(crate::parse::Error::new_multiple_comparison_operators(
 					comparison_operator, next_comparison_operator,
@@ -289,8 +291,7 @@ impl<'i> FormulaStr<'i>
 
 			println!("{}  parsing “{:?}” comparison: {}", indentation, comparison_operator, input);
 
-			let mut comparison_operator_split =
-				TokenSplit::new(self.filter_comparison_operators(), self.input);
+			let mut comparison_operator_split = self.comparison_operators().split();
 
 			// There’s exactly one comparison operator in this formula, as we have verified above.
 			// Hence, the split is guaranteed to generate exactly these two elements
@@ -371,19 +372,18 @@ impl std::fmt::Debug for Quantifier
 }
 
 // TODO: refactor
-fn implication_left_to_right_inner<'i, T>(
-	mut split_formula_at_logical_connective: TokenSplit<'i, T, Token<'i>>, level: usize)
+fn implication_left_to_right_inner<'i, T>(mut logical_connective_iterator: T, level: usize)
 	-> Result<Option<crate::Formula>, crate::parse::Error>
 where
-	T: std::iter::Iterator<Item = Result<(usize, usize, Token<'i>), crate::parse::Error>>
+	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 {
-	match split_formula_at_logical_connective.next()
+	match logical_connective_iterator.next()
 	{
 		Some(argument) =>
 		{
 			// TODO: improve error handling if antecedent cannot be parsed
 			let argument = FormulaStr::new(argument?).parse(level)?;
-			match implication_left_to_right_inner(split_formula_at_logical_connective, level)?
+			match implication_left_to_right_inner(logical_connective_iterator, level)?
 			{
 				Some(next_argument) => Ok(Some(crate::Formula::implies(
 					crate::ImplicationDirection::LeftToRight, Box::new(argument),
@@ -395,19 +395,18 @@ where
 	}
 }
 
-fn implication_left_to_right<'i, T>(
-	mut split_formula_at_logical_connective: TokenSplit<'i, T, Token<'i>>, level: usize)
+fn implication_left_to_right<'i, T>(mut logical_connective_iterator: T, level: usize)
 	-> Result<crate::Formula, crate::parse::Error>
 where
-	T: std::iter::Iterator<Item = Result<(usize, usize, Token<'i>), crate::parse::Error>>
+	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 {
-	match split_formula_at_logical_connective.next()
+	match logical_connective_iterator.next()
 	{
 		Some(argument) =>
 		{
 			// TODO: improve error handling if antecedent cannot be parsed
 			let argument = FormulaStr::new(argument?).parse(level)?;
-			match implication_left_to_right_inner(split_formula_at_logical_connective, level)?
+			match implication_left_to_right_inner(logical_connective_iterator, level)?
 			{
 				Some(next_argument) => Ok(crate::Formula::implies(
 					crate::ImplicationDirection::LeftToRight, Box::new(argument),
