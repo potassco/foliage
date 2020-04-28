@@ -222,14 +222,25 @@ impl<'i> FormulaStr<'i>
 				LogicalConnective::ImpliesLeftToRight =>
 					return implication_left_to_right(
 						self.split_at_logical_connective(top_level_logical_connective), level + 1),
-				/*LogicalConnective::ImpliesRightToLeft => unimplemented!(),*/
-				_ =>
+				LogicalConnective::ImpliesRightToLeft =>
 				{
-					println!("{}  TODO: parse implication", indentation);
+					let mut argument_iterator =
+						self.split_at_logical_connective(top_level_logical_connective);
+					let first_argument = argument_iterator.next().ok_or_else(||
+						crate::parse::Error::new_expected_logical_connective_argument(
+							"right-to-left implication".to_string(),
+							crate::parse::error::Location::new(0, Some(0))))?;
+					let first_argument = FormulaStr::new(first_argument?).parse(level + 1)?;
 
-					// TODO: implement correctly
-					return Ok(crate::Formula::true_());
-				}
+					return argument_iterator.try_fold(first_argument,
+						|accumulator, argument|
+						{
+							let argument = FormulaStr::new(argument?).parse(level + 1)?;
+
+							Ok(crate::Formula::implies(crate::ImplicationDirection::RightToLeft,
+								Box::new(accumulator), Box::new(argument)))
+						});
+				},
 			}
 		}
 
