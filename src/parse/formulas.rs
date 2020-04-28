@@ -126,29 +126,9 @@ impl<'i> FormulaStr<'i>
 	pub fn top_level_logical_connective(&self)
 		-> Result<Option<LogicalConnective>, crate::parse::Error>
 	{
-		let logical_connective = |token| match token
-		{
-			Token::Identifier(identifier) => match identifier
-			{
-				"and" => Some(LogicalConnective::And),
-				"or" => Some(LogicalConnective::Or),
-				_ => None,
-			},
-			Token::Symbol(symbol) => match symbol
-			{
-				Symbol::ArrowLeft => Some(LogicalConnective::ImpliesRightToLeft),
-				Symbol::ArrowLeftAndRight => Some(LogicalConnective::IfAndOnlyIf),
-				Symbol::ArrowRight => Some(LogicalConnective::ImpliesLeftToRight),
-				_ => None,
-			},
-			_ => None,
-		};
-
-		let logical_connectives = Tokens::new_filter_map(self.input, logical_connective);
-
 		let mut top_level_logical_connective = None;
 
-		for logical_connective in logical_connectives
+		for logical_connective in self.logical_connectives()
 		{
 			let (_, logical_connective) = logical_connective?;
 
