@@ -22,7 +22,6 @@ enum LogicalConnective
 	Or,
 }
 
-// TODO: rename to logic infix connective
 impl LogicalConnective
 {
 	fn level(&self) -> usize
@@ -184,7 +183,8 @@ impl<'i> FormulaStr<'i>
 		// Parse logical infix connectives
 		if let Some(top_level_logical_connective) = self.top_level_logical_connective()?
 		{
-			println!("{}  parsing “{:?}” infix formula", indentation, top_level_logical_connective);
+			println!("{}  parsing “{:?}” logical connective", indentation,
+				top_level_logical_connective);
 
 			// Parse arguments of n-ary logical infix connectives
 			let arguments_n_ary = ||
@@ -466,59 +466,59 @@ mod tests
 	use super::*;
 
 	#[test]
-	fn tokenize_formula_infix_operators()
+	fn tokenize_formula_logical_connectives()
 	{
 		let f = FormulaStr::new("((forall X exists Y (p(X) -> q(Y)) and false) or p) -> false");
-		assert_eq!(f.top_level_infix_operator().unwrap(),
-			Some(FormulaInfixOperator::ImpliesLeftToRight));
-		let mut i = f.iter_infix_operators();
-		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::ImpliesLeftToRight);
+		assert_eq!(f.top_level_logical_connective().unwrap(),
+			Some(LogicalConnective::ImpliesLeftToRight));
+		let mut i = f.logical_connectives();
+		assert_eq!(i.next().unwrap().unwrap().1, LogicalConnective::ImpliesLeftToRight);
 		assert!(i.next().is_none());
 
 		let f = FormulaStr::new("forall X exists Y (p(X) -> q(Y)) and false or p -> false");
-		assert_eq!(f.top_level_infix_operator().unwrap(),
-			Some(FormulaInfixOperator::ImpliesLeftToRight));
-		let mut i = f.iter_infix_operators();
-		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::And);
-		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::Or);
-		assert_eq!(i.next().unwrap().unwrap().2, FormulaInfixOperator::ImpliesLeftToRight);
+		assert_eq!(f.top_level_logical_connective().unwrap(),
+			Some(LogicalConnective::ImpliesLeftToRight));
+		let mut i = f.logical_connectives();
+		assert_eq!(i.next().unwrap().unwrap().1, LogicalConnective::And);
+		assert_eq!(i.next().unwrap().unwrap().1, LogicalConnective::Or);
+		assert_eq!(i.next().unwrap().unwrap().1, LogicalConnective::ImpliesLeftToRight);
 		assert!(i.next().is_none());
 
 		let f = FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ");
-		assert_eq!(f.top_level_infix_operator().unwrap(),
-			Some(FormulaInfixOperator::ImpliesLeftToRight));
-		let mut i = f.split_at_infix_operator(FormulaInfixOperator::ImpliesLeftToRight);
+		assert_eq!(f.top_level_logical_connective().unwrap(),
+			Some(LogicalConnective::ImpliesLeftToRight));
+		let mut i = f.split_at_logical_connective(LogicalConnective::ImpliesLeftToRight);
 		assert_eq!(i.next().unwrap().unwrap(), "p");
 		assert_eq!(i.next().unwrap().unwrap(), "forall X exists Y (p(X) -> q(Y)) and false or p");
 		assert_eq!(i.next().unwrap().unwrap(), "false");
 		assert!(i.next().is_none());
 
 		let f = FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ");
-		assert_eq!(f.top_level_infix_operator().unwrap(),
-			Some(FormulaInfixOperator::ImpliesLeftToRight));
-		let mut i = f.split_at_infix_operator(FormulaInfixOperator::And);
+		assert_eq!(f.top_level_logical_connective().unwrap(),
+			Some(LogicalConnective::ImpliesLeftToRight));
+		let mut i = f.split_at_logical_connective(LogicalConnective::And);
 		assert_eq!(i.next().unwrap().unwrap(), "p -> forall X exists Y (p(X) -> q(Y))");
 		assert_eq!(i.next().unwrap().unwrap(), "false or p -> false");
 		assert!(i.next().is_none());
 
 		let f = FormulaStr::new("  p and forall X exists Y (p(X) -> q(Y)) and false or p or false  ");
-		assert_eq!(f.top_level_infix_operator().unwrap(), Some(FormulaInfixOperator::Or));
-		let mut i = f.split_at_infix_operator(FormulaInfixOperator::Or);
+		assert_eq!(f.top_level_logical_connective().unwrap(), Some(LogicalConnective::Or));
+		let mut i = f.split_at_logical_connective(LogicalConnective::Or);
 		assert_eq!(i.next().unwrap().unwrap(), "p and forall X exists Y (p(X) -> q(Y)) and false");
 		assert_eq!(i.next().unwrap().unwrap(), "p");
 		assert_eq!(i.next().unwrap().unwrap(), "false");
 		assert!(i.next().is_none());
 
 		let f = FormulaStr::new(" (p and q) ");
-		assert!(f.top_level_infix_operator().unwrap().is_none());
-		let mut i = f.split_at_infix_operator(FormulaInfixOperator::And);
+		assert!(f.top_level_logical_connective().unwrap().is_none());
+		let mut i = f.split_at_logical_connective(LogicalConnective::And);
 		assert_eq!(i.next().unwrap().unwrap(), "(p and q)");
 		assert!(i.next().is_none());
 
 		assert!(FormulaStr::new(" a -> b -> c ").parse(0).is_ok());
 		assert!(FormulaStr::new(" a -> b <- c ").parse(0).is_err());
 
-		assert!(!FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ")
+		assert!(FormulaStr::new("  p -> forall X exists Y (p(X) -> q(Y)) and false or p -> false  ")
 			.parse(0).is_ok());
 	}
 }
