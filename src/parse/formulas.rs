@@ -82,7 +82,8 @@ where
 	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
 {
 	pub fn new(input: &'i str, declarations: &'d D,
-		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>) -> Self
+		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>)
+		-> Self
 	{
 		Self
 		{
@@ -366,10 +367,8 @@ where
 					crate::parse::error::Location::new(0, Some(0))))
 			}
 
-			// TODO: implement look-up
-			let declaration =
-				crate::PredicateDeclaration::new(predicate_name.to_string(), arguments.len());
-			let declaration = std::rc::Rc::new(declaration);
+			let declaration = self.declarations.find_or_create_predicate_declaration(predicate_name,
+				arguments.len());
 
 			return Ok(crate::Formula::predicate(declaration, arguments));
 		}
