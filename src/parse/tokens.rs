@@ -192,7 +192,7 @@ fn number_string(input: &str) -> Option<(&str, &str)>
 	}
 }
 
-pub(crate) fn number(input: &str) -> Result<Option<(usize, &str)>, crate::parse::Error>
+pub fn number(input: &str) -> Result<Option<(usize, &str)>, crate::parse::Error>
 {
 	let (number_string, remaining_input) = match number_string(input)
 	{
