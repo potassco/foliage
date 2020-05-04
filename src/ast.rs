@@ -555,3 +555,9 @@ impl Formula
 		Self::boolean(true)
 	}
 }
+
+pub struct ClosedFormula
+{
+	pub free_variable_declarations: std::rc::Rc<VariableDeclarations>,
+	pub formula: Formula,
+}
