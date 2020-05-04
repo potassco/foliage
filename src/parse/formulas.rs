@@ -375,7 +375,6 @@ where
 
 			let declaration = self.declarations.find_or_create_predicate_declaration(predicate_name,
 				arguments.len());
-
 			return Ok(crate::Formula::predicate(declaration, arguments));
 		}
 

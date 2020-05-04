@@ -434,9 +434,7 @@ where
 							crate::parse::error::Location::new(0, Some(0))))
 					}
 
-					// TODO: implement look-up
-					let declaration = crate::VariableDeclaration::new(identifier.to_string());
-					let declaration = std::rc::Rc::new(declaration);
+					let declaration = self.variable_declaration_stack.find_or_create(identifier);
 					return Ok(crate::Term::variable(declaration));
 				},
 				_ if is_function_name(identifier) =>
