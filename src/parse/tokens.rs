@@ -109,7 +109,7 @@ fn is_identifier_body_character(character: char) -> bool
 	}
 }
 
-pub(crate) fn identifier(input: &str) -> Option<(&str, &str)>
+pub fn identifier(input: &str) -> Option<(&str, &str)>
 {
 	let mut characters = input.char_indices();
 
