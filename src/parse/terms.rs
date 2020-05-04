@@ -467,11 +467,8 @@ where
 							crate::parse::error::Location::new(0, Some(0))))
 					}
 
-					// TODO: implement look-up
-					let declaration =
-						crate::FunctionDeclaration::new(function_name.to_string(), arguments.len());
-					let declaration = std::rc::Rc::new(declaration);
-
+					let declaration = self.declarations.find_or_create_function_declaration(
+						function_name, arguments.len());
 					return Ok(crate::Term::function(declaration, arguments));
 				},
 				_ => (),
