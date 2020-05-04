@@ -1,11 +1,5 @@
 use super::tokens::*;
 
-pub fn parse_term(input: &str) -> Result<crate::Term, crate::parse::Error>
-{
-	let term_str = TermStr::new(input);
-	term_str.parse(0)
-}
-
 pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
 {
 	let (identifier, remaining_input) = identifier(input)?;
@@ -168,18 +162,26 @@ impl std::fmt::Debug for ArithmeticOperatorClass
 	}
 }
 
-pub(crate) struct TermStr<'i>
+pub(crate) struct TermStr<'i, 'd, 'v, 'p, D>
 {
 	input: &'i str,
+	declarations: &'d D,
+	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>,
 }
 
-impl<'i> TermStr<'i>
+impl<'i, 'd, 'v, 'p, D> TermStr<'i, 'd, 'v, 'p, D>
+where
+	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
 {
-	pub fn new(input: &'i str) -> Self
+	pub fn new(input: &'i str, declarations: &'d D,
+		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>)
+		-> Self
 	{
 		Self
 		{
 			input,
+			declarations,
+			variable_declaration_stack,
 		}
 	}
 
@@ -324,7 +326,7 @@ impl<'i> TermStr<'i>
 
 			if top_level_arithmetic_operator_class == ArithmeticOperatorClass::Exponential
 			{
-				return exponentiate(
+				return self.exponentiate(
 					self.filter_by_arithmetic_operator_class(top_level_arithmetic_operator_class)
 						.split(), level + 1);
 			}
@@ -336,7 +338,9 @@ impl<'i> TermStr<'i>
 			let (first_argument, first_binary_operator) = argument_iterator.next().ok_or_else(||
 				crate::parse::Error::new_expected_term(
 					crate::parse::error::Location::new(0, Some(0))))??;
-			let first_argument = TermStr::new(first_argument).parse(level + 1)?;
+			let first_argument =
+				TermStr::new(first_argument, self.declarations, self.variable_declaration_stack)
+					.parse(level + 1)?;
 			// TODO: improve error handling if the terms between the operators are invalid
 
 			let (accumulator, last_binary_operator) =
@@ -344,7 +348,9 @@ impl<'i> TermStr<'i>
 					|(accumulator, binary_operator), argument|
 					{
 						let (argument, next_binary_operator) = argument?;
-						let argument = TermStr::new(argument).parse(level + 1)?;
+						let argument = TermStr::new(argument, self.declarations,
+							self.variable_declaration_stack)
+								.parse(level + 1)?;
 						let binary_operation =
 							crate::BinaryOperation::new(binary_operator, Box::new(accumulator),
 								Box::new(argument));
@@ -355,7 +361,9 @@ impl<'i> TermStr<'i>
 
 			// The last item hasn’t been consumed yet, so it’s safe to unwrap it
 			let last_argument = argument_iterator.remaining_input().unwrap();
-			let last_argument = TermStr::new(last_argument).parse(level + 1)?;
+			let last_argument =
+				TermStr::new(last_argument, self.declarations, self.variable_declaration_stack)
+					.parse(level + 1)?;
 			let last_binary_operation =
 				crate::BinaryOperation::new(last_binary_operator, Box::new(accumulator),
 					Box::new(last_argument));
@@ -445,7 +453,9 @@ impl<'i> TermStr<'i>
 						{
 							let functor = |token: &_| *token == Token::Symbol(Symbol::Comma);
 							let arguments = Tokens::new_filter(parenthesized_expression, functor).split()
-								.map(|argument| TermStr::new(argument?).parse(level + 1))
+								.map(|argument| TermStr::new(argument?, self.declarations,
+									self.variable_declaration_stack)
+										.parse(level + 1))
 								.collect::<Result<_, _>>()?;
 
 							(arguments, input)
@@ -481,58 +491,64 @@ impl<'i> TermStr<'i>
 					crate::parse::error::Location::new(0, Some(0))));
 			}
 
-			return TermStr::new(parenthesized_expression).parse(level + 1);
+			return TermStr::new(parenthesized_expression, self.declarations,
+				self.variable_declaration_stack)
+					.parse(level + 1);
 		}
 
 		Err(crate::parse::Error::new_unexpected_token(
 			crate::parse::error::Location::new(0, Some(0))))
 	}
-}
 
-// TODO: refactor
-fn exponentiate_inner<'i, T>(mut argument_iterator: T, level: usize)
-	-> Result<Option<crate::Term>, crate::parse::Error>
-where
-	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
-{
-	match argument_iterator.next()
+	// TODO: refactor
+	fn exponentiate_inner<T>(&self, mut argument_iterator: T, level: usize)
+		-> Result<Option<crate::Term>, crate::parse::Error>
+	where
+		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
-		Some(argument) =>
+		match argument_iterator.next()
 		{
-			// TODO: improve error handling if antecedent cannot be parsed
-			let argument = TermStr::new(argument?).parse(level)?;
-			match exponentiate_inner(argument_iterator, level)?
+			Some(argument) =>
 			{
-				Some(next_argument) => Ok(Some(crate::Term::exponentiate(Box::new(argument),
-					Box::new(next_argument)))),
-				None => Ok(Some(argument)),
-			}
-		},
-		None => Ok(None),
+				// TODO: improve error handling if antecedent cannot be parsed
+				let argument =
+					TermStr::new(argument?, self.declarations, self.variable_declaration_stack)
+						.parse(level)?;
+				match self.exponentiate_inner(argument_iterator, level)?
+				{
+					Some(next_argument) => Ok(Some(crate::Term::exponentiate(Box::new(argument),
+						Box::new(next_argument)))),
+					None => Ok(Some(argument)),
+				}
+			},
+			None => Ok(None),
+		}
 	}
-}
 
-fn exponentiate<'i, T>(mut argument_iterator: T, level: usize)
-	-> Result<crate::Term, crate::parse::Error>
-where
-	T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
-{
-	match argument_iterator.next()
+	fn exponentiate<T>(&self, mut argument_iterator: T, level: usize)
+		-> Result<crate::Term, crate::parse::Error>
+	where
+		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
-		Some(argument) =>
+		match argument_iterator.next()
 		{
-			// TODO: improve error handling if antecedent cannot be parsed
-			let argument = TermStr::new(argument?).parse(level)?;
-			match exponentiate_inner(argument_iterator, level)?
+			Some(argument) =>
 			{
-				Some(next_argument) =>
-					Ok(crate::Term::exponentiate(Box::new(argument), Box::new(next_argument))),
-				None => Err(crate::parse::Error::new_expected_term(
-					crate::parse::error::Location::new(0, Some(0)))),
-			}
-		},
-		None => Err(crate::parse::Error::new_expected_term(
-			crate::parse::error::Location::new(0, Some(0)))),
+				// TODO: improve error handling if antecedent cannot be parsed
+				let argument =
+					TermStr::new(argument?, self.declarations, self.variable_declaration_stack)
+						.parse(level)?;
+				match self.exponentiate_inner(argument_iterator, level)?
+				{
+					Some(next_argument) =>
+						Ok(crate::Term::exponentiate(Box::new(argument), Box::new(next_argument))),
+					None => Err(crate::parse::Error::new_expected_term(
+						crate::parse::error::Location::new(0, Some(0)))),
+				}
+			},
+			None => Err(crate::parse::Error::new_expected_term(
+				crate::parse::error::Location::new(0, Some(0)))),
+		}
 	}
 }
 

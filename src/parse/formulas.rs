@@ -332,8 +332,12 @@ where
 			let input_right = comparison_operator_split.next().unwrap()?;
 			assert!(comparison_operator_split.next().is_none());
 
-			let argument_left = TermStr::new(input_left).parse(level + 1)?;
-			let argument_right = TermStr::new(input_right).parse(level + 1)?;
+			let argument_left =
+				TermStr::new(input_left, self.declarations, self.variable_declaration_stack)
+					.parse(level + 1)?;
+			let argument_right =
+				TermStr::new(input_right, self.declarations, self.variable_declaration_stack)
+					.parse(level + 1)?;
 
 			return Ok(crate::Formula::compare(comparison_operator, Box::new(argument_left),
 				Box::new(argument_right)));
@@ -353,7 +357,9 @@ where
 				{
 					let functor = |token: &_| *token == Token::Symbol(Symbol::Comma);
 					let arguments = Tokens::new_filter(parenthesized_expression, functor).split()
-						.map(|argument| TermStr::new(argument?).parse(level + 1))
+						.map(|argument| TermStr::new(argument?, self.declarations,
+							self.variable_declaration_stack)
+								.parse(level + 1))
 						.collect::<Result<_, _>>()?;
 
 					(arguments, input)
