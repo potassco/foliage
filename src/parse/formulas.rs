@@ -195,7 +195,7 @@ where
 		let indentation = "  ".repeat(level);
 		let input = self.input.trim_start();
 
-		println!("{}- parsing formula: {}", indentation, input);
+		log::trace!("{}- parsing formula: {}", indentation, input);
 
 		match input.chars().next()
 		{
@@ -209,7 +209,7 @@ where
 		// Parse logical infix connectives
 		if let Some(top_level_logical_connective) = self.top_level_logical_connective()?
 		{
-			println!("{}  parsing “{:?}” logical connective", indentation,
+			log::trace!("{}  parsing “{:?}” logical connective", indentation,
 				top_level_logical_connective);
 
 			// Parse arguments of n-ary logical infix connectives
@@ -260,7 +260,7 @@ where
 				"not" =>
 				{
 					let input = input.trim_start();
-					println!("{}  parsing “not” formula body: {}", indentation, input);
+					log::trace!("{}  parsing “not” formula body: {}", indentation, input);
 
 					let argument = FormulaStr::new(input, self.declarations, self.variable_declaration_stack).parse(level + 1)?;
 
@@ -299,7 +299,7 @@ where
 			if let Some(quantifier) = quantifier
 			{
 				let input = input.trim_start();
-				println!("{}  parsing “{:?}” formula body: {}", indentation, quantifier, input);
+				log::trace!("{}  parsing “{:?}” formula body: {}", indentation, quantifier, input);
 
 				return self.quantified_formula(input, quantifier, level + 1);
 			}
@@ -322,7 +322,7 @@ where
 					crate::parse::error::Location::new(0, Some(0))));
 			}
 
-			println!("{}  parsing “{:?}” comparison: {}", indentation, comparison_operator, input);
+			log::trace!("{}  parsing “{:?}” comparison: {}", indentation, comparison_operator, input);
 
 			let mut comparison_operator_split = self.comparison_operators().split();
 
@@ -346,7 +346,7 @@ where
 		// Parse predicates
 		if let Some((predicate_name, input)) = predicate_name(input)
 		{
-			println!("{}  parsing predicate {}", indentation, predicate_name);
+			log::trace!("{}  parsing predicate {}", indentation, predicate_name);
 
 			let input = input.trim_start();
 

@@ -302,7 +302,7 @@ where
 	pub fn parse(&self, level: usize) -> Result<crate::Term, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
-		println!("{}- parsing term: {}", indentation, self.input);
+		log::trace!("{}- parsing term: {}", indentation, self.input);
 
 		let input = self.input.trim_start();
 
@@ -321,7 +321,7 @@ where
 		if let Some(top_level_arithmetic_operator_class) =
 			self.top_level_arithmetic_operator_class()?
 		{
-			println!("{}  parsing {:?} arithmetic term", indentation,
+			log::trace!("{}  parsing {:?} arithmetic term", indentation,
 				top_level_arithmetic_operator_class);
 
 			if top_level_arithmetic_operator_class == ArithmeticOperatorClass::Exponential
@@ -440,7 +440,7 @@ where
 				_ if is_function_name(identifier) =>
 				{
 					let function_name = identifier;
-					println!("{}  parsing function {}", indentation, function_name);
+					log::trace!("{}  parsing function {}", indentation, function_name);
 
 					let input = input.trim_start();
 

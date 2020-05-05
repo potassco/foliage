@@ -11,3 +11,6 @@ keywords = ["logic"]
 categories = ["data-structures", "science"]
 license = "MIT"
 edition = "2018"
+
+[dependencies]
+log = "0.4"
