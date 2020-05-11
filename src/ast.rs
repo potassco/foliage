@@ -556,7 +556,7 @@ impl Formula
 	}
 }
 
-pub struct ClosedFormula
+pub struct OpenFormula
 {
 	pub free_variable_declarations: std::rc::Rc<VariableDeclarations>,
 	pub formula: Formula,

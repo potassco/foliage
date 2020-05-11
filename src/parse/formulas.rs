@@ -1,8 +1,7 @@
 use super::terms::*;
 use super::tokens::*;
 
-pub fn formula<D>(input: &str, declarations: &D)
-	-> Result<crate::ClosedFormula, crate::parse::Error>
+pub fn formula<D>(input: &str, declarations: &D) -> Result<crate::OpenFormula, crate::parse::Error>
 where
 	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
 {
@@ -18,7 +17,7 @@ where
 		_ => unreachable!(),
 	};
 
-	Ok(crate::ClosedFormula
+	Ok(crate::OpenFormula
 	{
 		formula,
 		free_variable_declarations,
