@@ -3,6 +3,42 @@ fn substring_offset(substring: &str, string: &str) -> usize
 	substring.as_ptr() as usize - string.as_ptr() as usize
 }
 
+pub fn trim_start(mut input: &str) -> &str
+{
+	loop
+	{
+		let original_input = input;
+
+		input = input.trim_start();
+
+		let mut input_characters = input.chars();
+
+		if let Some('#') = input_characters.next()
+		{
+			input = input_characters.as_str();
+
+			match (input.find('\n'), input.find('\r'))
+			{
+				(Some(newline_index), Some(carriage_return_index)) =>
+				{
+					let split_index = std::cmp::min(newline_index, carriage_return_index);
+					input = input.split_at(split_index).1;
+				},
+				(Some(split_index), _)
+				| (_, Some(split_index)) => input = input.split_at(split_index).1,
+				_ => input = &input[..input.len()],
+			}
+		}
+
+		if input.is_empty() || input == original_input
+		{
+			break;
+		}
+	}
+
+	input
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Keyword
 {
@@ -366,7 +402,7 @@ impl<'i, F> Tokens<'i, F>
 
 	fn next_token(&mut self) -> Option<Result<(usize, usize, Token<'i>), crate::parse::Error>>
 	{
-		self.input = self.input.trim_start();
+		self.input = trim_start(self.input);
 		let index_left = substring_offset(self.input, self.original_input);
 
 		let first_character = match self.input.chars().next()

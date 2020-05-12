@@ -104,7 +104,7 @@ pub(crate) fn variable_declarations(input: &str)
 
 	loop
 	{
-		input = input.trim_start();
+		input = trim_start(input);
 
 		input = match symbol(input)
 		{
@@ -113,7 +113,7 @@ pub(crate) fn variable_declarations(input: &str)
 			_ => return Ok(Some((variable_declarations, input))),
 		};
 
-		input = input.trim_start();
+		input = trim_start(input);
 
 		let (variable_declaration, remaining_input) = match variable_declaration(input)
 		{
@@ -304,7 +304,7 @@ where
 		let indentation = "  ".repeat(level);
 		log::trace!("{}- parsing term: {}", indentation, self.input);
 
-		let input = self.input.trim_start();
+		let input = trim_start(self.input);
 
 		match input.chars().next()
 		{
@@ -442,7 +442,7 @@ where
 					let function_name = identifier;
 					log::trace!("{}  parsing function {}", indentation, function_name);
 
-					let input = input.trim_start();
+					let input = trim_start(input);
 
 					// Parse arguments if there are any
 					let (arguments, input) = match parenthesized_expression(input)?

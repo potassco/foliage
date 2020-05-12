@@ -192,7 +192,7 @@ where
 	pub fn parse(&self, level: usize) -> Result<crate::Formula, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
-		let input = self.input.trim_start();
+		let input = trim_start(self.input);
 
 		log::trace!("{}- parsing formula: {}", indentation, input);
 
@@ -258,7 +258,7 @@ where
 			{
 				"not" =>
 				{
-					let input = input.trim_start();
+					let input = trim_start(input);
 					log::trace!("{}  parsing “not” formula body: {}", indentation, input);
 
 					let argument = FormulaStr::new(input, self.declarations, self.variable_declaration_stack).parse(level + 1)?;
@@ -297,7 +297,7 @@ where
 
 			if let Some(quantifier) = quantifier
 			{
-				let input = input.trim_start();
+				let input = trim_start(input);
 				log::trace!("{}  parsing “{:?}” formula body: {}", indentation, quantifier, input);
 
 				return self.quantified_formula(input, quantifier, level + 1);
@@ -347,7 +347,7 @@ where
 		{
 			log::trace!("{}  parsing predicate {}", indentation, predicate_name);
 
-			let input = input.trim_start();
+			let input = trim_start(input);
 
 			// Parse arguments if there are any
 			let (arguments, input) = match parenthesized_expression(input)?
