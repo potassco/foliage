@@ -245,7 +245,7 @@ where
 							let argument = FormulaStr::new(argument?, self.declarations, self.variable_declaration_stack).parse(level + 1)?;
 
 							Ok(crate::Formula::implies(crate::ImplicationDirection::RightToLeft,
-								Box::new(accumulator), Box::new(argument)))
+								Box::new(argument), Box::new(accumulator)))
 						});
 				},
 			}
