@@ -1,3 +1,4 @@
+use crate::flavor::VariableDeclaration as _;
 use super::tokens::*;
 
 pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
@@ -82,19 +83,23 @@ fn is_variable_name(identifier: &str) -> bool
 	false
 }
 
-pub(crate) fn variable_declaration(input: &str) -> Option<(crate::VariableDeclaration, &str)>
+pub(crate) fn variable_declaration<F>(input: &str) -> Option<(F::VariableDeclaration, &str)>
+where
+	F: crate::flavor::Flavor,
 {
 	variable_name(input)
 		.map(|(variable_name, remaining_input)|
-			(crate::VariableDeclaration::new(variable_name.to_string()), remaining_input))
+			(F::VariableDeclaration::new(variable_name.to_string()), remaining_input))
 }
 
-pub(crate) fn variable_declarations(input: &str)
-	-> Result<Option<(crate::VariableDeclarations, &str)>, crate::parse::Error>
+pub(crate) fn variable_declarations<F>(input: &str)
+	-> Result<Option<(crate::VariableDeclarations<F>, &str)>, crate::parse::Error>
+where
+	F: crate::flavor::Flavor,
 {
 	let mut variable_declarations = vec![];
 
-	let (first_variable_declaration, mut input) = match variable_declaration(input)
+	let (first_variable_declaration, mut input) = match variable_declaration::<F>(input)
 	{
 		Some(first_variable_declaration) => first_variable_declaration,
 		None => return Ok(None),
@@ -115,7 +120,7 @@ pub(crate) fn variable_declarations(input: &str)
 
 		input = trim_start(input);
 
-		let (variable_declaration, remaining_input) = match variable_declaration(input)
+		let (variable_declaration, remaining_input) = match variable_declaration::<F>(input)
 		{
 			Some(variable_declaration) => variable_declaration,
 			None => return Err(crate::parse::Error::new_expected_variable_declaration(
@@ -162,19 +167,22 @@ impl std::fmt::Debug for ArithmeticOperatorClass
 	}
 }
 
-pub(crate) struct TermStr<'i, 'd, 'v, 'p, D>
+pub(crate) struct TermStr<'i, 'd, 'v, 'p, F, D>
+where
+	F: crate::flavor::Flavor,
 {
 	input: &'i str,
 	declarations: &'d D,
-	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>,
+	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>,
 }
 
-impl<'i, 'd, 'v, 'p, D> TermStr<'i, 'd, 'v, 'p, D>
+impl<'i, 'd, 'v, 'p, F, D> TermStr<'i, 'd, 'v, 'p, F, D>
 where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
+	F: crate::flavor::Flavor,
+	D: crate::FindOrCreateFunctionDeclaration<F> + crate::FindOrCreatePredicateDeclaration<F>,
 {
 	pub fn new(input: &'i str, declarations: &'d D,
-		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>)
+		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>)
 		-> Self
 	{
 		Self
@@ -299,7 +307,7 @@ where
 		Ok(top_level_arithmetic_operator_class)
 	}
 
-	pub fn parse(&self, level: usize) -> Result<crate::Term, crate::parse::Error>
+	pub fn parse(&self, level: usize) -> Result<crate::Term<F>, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
 		log::trace!("{}- parsing term: {}", indentation, self.input);
@@ -497,7 +505,7 @@ where
 
 	// TODO: refactor
 	fn exponentiate_inner<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<Option<crate::Term>, crate::parse::Error>
+		-> Result<Option<crate::Term<F>>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -521,7 +529,7 @@ where
 	}
 
 	fn exponentiate<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<crate::Term, crate::parse::Error>
+		-> Result<crate::Term<F>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -572,6 +580,9 @@ mod tests
 	#[test]
 	fn parse_variable_declaration()
 	{
+		let variable_declaration =
+			|x| super::variable_declaration::<crate::flavor::DefaultFlavor>(x);
+
 		let v = variable_declaration("X").unwrap();
 		assert_eq!((v.0.name.as_str(), v.1), ("X", ""));
 		let v = variable_declaration("_X").unwrap();
@@ -601,6 +612,9 @@ mod tests
 	#[test]
 	fn parse_variable_declarations()
 	{
+		let variable_declarations =
+			|x| super::variable_declarations::<crate::flavor::DefaultFlavor>(x);
+
 		let v = variable_declarations("X.").unwrap().unwrap();
 		assert_eq!(v.0.len(), 1);
 		assert_eq!(v.0[0].name.as_str(), "X");

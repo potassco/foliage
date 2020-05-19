@@ -1,3 +1,5 @@
+use crate::flavor::FunctionDeclaration as _;
+
 impl std::fmt::Debug for crate::SpecialInteger
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
@@ -58,19 +60,18 @@ pub(crate) enum TermPosition
 	Right,
 }
 
-pub struct TermDisplay<'term, 'format, F>
+pub struct TermDisplay<'term, F>
 where
-	F: super::Format,
+	F: crate::flavor::Flavor,
 {
-	term: &'term crate::Term,
-	parent_term: Option<&'term crate::Term>,
+	term: &'term crate::Term<F>,
+	parent_term: Option<&'term crate::Term<F>>,
 	position: TermPosition,
-	format: &'format F,
 }
 
-impl<'term, 'format, F> TermDisplay<'term, 'format, F>
+impl<'term, F> TermDisplay<'term, F>
 where
-	F: super::Format,
+	F: crate::flavor::Flavor,
 {
 	fn requires_parentheses(&self) -> bool
 	{
@@ -154,24 +155,23 @@ where
 	}
 }
 
-pub(crate) fn display_term<'term, 'format, F>(term: &'term crate::Term,
-	parent_term: Option<&'term crate::Term>, position: TermPosition, format: &'format F)
-	-> TermDisplay<'term, 'format, F>
+pub(crate) fn display_term<'term, F>(term: &'term crate::Term<F>,
+	parent_term: Option<&'term crate::Term<F>>, position: TermPosition)
+	-> TermDisplay<'term, F>
 where
-	F: super::Format,
+	F: crate::flavor::Flavor,
 {
 	TermDisplay
 	{
 		term,
 		parent_term,
 		position,
-		format,
 	}
 }
 
-impl<'term, 'format, F> std::fmt::Debug for TermDisplay<'term, 'format, F>
+impl<'term, F> std::fmt::Debug for TermDisplay<'term, F>
 where
-	F: super::Format,
+	F: crate::flavor::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -190,15 +190,14 @@ where
 			crate::Term::Integer(value) => write!(formatter, "{}", value)?,
 			crate::Term::String(value) => write!(formatter, "\"{}\"",
 				value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t"))?,
-			crate::Term::Variable(variable) =>
-				self.format.display_variable_declaration(formatter, &variable.declaration)?,
+			crate::Term::Variable(variable) => write!(formatter, "{}", variable.declaration)?,
 			crate::Term::Function(function) =>
 			{
-				write!(formatter, "{}", function.declaration.name)?;
+				write!(formatter, "{}", function.declaration.name())?;
 
-				assert!(function.declaration.arity == function.arguments.len(),
+				assert!(function.declaration.arity() == function.arguments.len(),
 					"number of function arguments differs from declaration (expected {}, got {})",
-					function.declaration.arity, function.arguments.len());
+					function.declaration.arity(), function.arguments.len());
 
 				if !function.arguments.is_empty()
 				{
@@ -209,8 +208,7 @@ where
 					for argument in &function.arguments
 					{
 						write!(formatter, "{}{:?}", separator,
-							display_term(&argument, Some(self.term), TermPosition::Any,
-								self.format))?;
+							display_term(&argument, Some(self.term), TermPosition::Any))?;
 
 						separator = ", ";
 					}
@@ -231,20 +229,18 @@ where
 				};
 
 				write!(formatter, "{:?} {} {:?}",
-					display_term(&binary_operation.left, Some(self.term), TermPosition::Left,
-						self.format),
+					display_term(&binary_operation.left, Some(self.term), TermPosition::Left),
 					operator_string,
-					display_term(&binary_operation.right, Some(self.term), TermPosition::Right,
-						self.format))?;
+					display_term(&binary_operation.right, Some(self.term), TermPosition::Right))?;
 			},
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::Negative, argument})
 				=> write!(formatter, "-{:?}",
-					display_term(argument, Some(self.term), TermPosition::Any, self.format))?,
+					display_term(argument, Some(self.term), TermPosition::Any))?,
 			crate::Term::UnaryOperation(
 				crate::UnaryOperation{operator: crate::UnaryOperator::AbsoluteValue, argument})
 				=> write!(formatter, "|{:?}|",
-					display_term(argument, Some(self.term), TermPosition::Any, self.format))?,
+					display_term(argument, Some(self.term), TermPosition::Any))?,
 		}
 
 		if requires_parentheses
@@ -256,9 +252,9 @@ where
 	}
 }
 
-impl<'term, 'format, F> std::fmt::Display for TermDisplay<'term, 'format, F>
+impl<'term, F> std::fmt::Display for TermDisplay<'term, F>
 where
-	F: super::Format,
+	F: crate::flavor::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -266,20 +262,23 @@ where
 	}
 }
 
-impl std::fmt::Debug for crate::Term
+impl<F> std::fmt::Debug for crate::Term<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{:?}", display_term(&self, None, TermPosition::Any,
-			&super::DefaultFormat))
+		write!(formatter, "{:?}", display_term(&self, None, TermPosition::Any))
 	}
 }
 
-impl std::fmt::Display for crate::Term
+impl<F> std::fmt::Display for crate::Term<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		write!(formatter, "{}", display_term(&self, None, TermPosition::Any, &super::DefaultFormat))
+		write!(formatter, "{}", display_term(&self, None, TermPosition::Any))
 	}
 }
 
@@ -287,6 +286,7 @@ impl std::fmt::Display for crate::Term
 pub(crate) mod tests
 {
 	use crate::*;
+	type Term = crate::Term<flavor::DefaultFlavor>;
 
 	macro_rules! assert
 	{
@@ -296,7 +296,7 @@ pub(crate) mod tests
 		};
 	}
 
-	fn format(term: Box<ast::Term>) -> String
+	fn format(term: Box<Term>) -> String
 	{
 		format!("{}", term)
 	}

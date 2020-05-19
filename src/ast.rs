@@ -1,3 +1,5 @@
+use crate::flavor::{FunctionDeclaration as _, PredicateDeclaration as _};
+
 // Operators
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -59,7 +61,8 @@ impl FunctionDeclaration
 	}
 }
 
-pub type FunctionDeclarations = std::collections::BTreeSet<std::rc::Rc<FunctionDeclaration>>;
+pub type FunctionDeclarations<F> =
+	std::collections::BTreeSet<std::rc::Rc<<F as crate::flavor::Flavor>::FunctionDeclaration>>;
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PredicateDeclaration
@@ -80,7 +83,8 @@ impl PredicateDeclaration
 	}
 }
 
-pub type PredicateDeclarations = std::collections::BTreeSet<std::rc::Rc<PredicateDeclaration>>;
+pub type PredicateDeclarations<F> =
+	std::collections::BTreeSet<std::rc::Rc<<F as crate::flavor::Flavor>::PredicateDeclaration>>;
 
 pub struct VariableDeclaration
 {
@@ -149,21 +153,26 @@ impl VariableDeclaration
 	}
 }
 
-pub type VariableDeclarations = Vec<std::rc::Rc<VariableDeclaration>>;
+pub type VariableDeclarations<F> =
+	Vec<std::rc::Rc<<F as crate::flavor::Flavor>::VariableDeclaration>>;
 
 // Terms
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct BinaryOperation
+pub struct BinaryOperation<F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub operator: BinaryOperator,
-	pub left: Box<Term>,
-	pub right: Box<Term>,
+	pub left: Box<Term<F>>,
+	pub right: Box<Term<F>>,
 }
 
-impl BinaryOperation
+impl<F> BinaryOperation<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(operator: BinaryOperator, left: Box<Term>, right: Box<Term>) -> Self
+	pub fn new(operator: BinaryOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self
 		{
@@ -175,17 +184,21 @@ impl BinaryOperation
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Function
+pub struct Function<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub declaration: std::rc::Rc<FunctionDeclaration>,
-	pub arguments: Terms,
+	pub declaration: std::rc::Rc<F::FunctionDeclaration>,
+	pub arguments: Terms<F>,
 }
 
-impl Function
+impl<F> Function<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Terms) -> Self
+	pub fn new(declaration: std::rc::Rc<F::FunctionDeclaration>, arguments: Terms<F>) -> Self
 	{
-		assert_eq!(declaration.arity, arguments.len(),
+		assert_eq!(declaration.arity(), arguments.len(),
 			"function has a different number of arguments then declared");
 
 		Self
@@ -204,15 +217,19 @@ pub enum SpecialInteger
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct UnaryOperation
+pub struct UnaryOperation<F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub operator: UnaryOperator,
-	pub argument: Box<Term>,
+	pub argument: Box<Term<F>>,
 }
 
-impl UnaryOperation
+impl<F> UnaryOperation<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(operator: UnaryOperator, argument: Box<Term>) -> Self
+	pub fn new(operator: UnaryOperator, argument: Box<Term<F>>) -> Self
 	{
 		Self
 		{
@@ -223,14 +240,18 @@ impl UnaryOperation
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Variable
+pub struct Variable<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub declaration: std::rc::Rc<VariableDeclaration>,
+	pub declaration: std::rc::Rc<F::VariableDeclaration>,
 }
 
-impl Variable
+impl<F> Variable<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(declaration: std::rc::Rc<VariableDeclaration>) -> Self
+	pub fn new(declaration: std::rc::Rc<F::VariableDeclaration>) -> Self
 	{
 		Self
 		{
@@ -242,16 +263,20 @@ impl Variable
 // Formulas
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Compare
+pub struct Compare<F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub operator: ComparisonOperator,
-	pub left: Box<Term>,
-	pub right: Box<Term>,
+	pub left: Box<Term<F>>,
+	pub right: Box<Term<F>>,
 }
 
-impl Compare
+impl<F> Compare<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(operator: ComparisonOperator, left: Box<Term>, right: Box<Term>) -> Self
+	pub fn new(operator: ComparisonOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self
 		{
@@ -263,15 +288,19 @@ impl Compare
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct QuantifiedFormula
+pub struct QuantifiedFormula<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub parameters: std::rc::Rc<VariableDeclarations>,
-	pub argument: Box<Formula>,
+	pub parameters: std::rc::Rc<VariableDeclarations<F>>,
+	pub argument: Box<Formula<F>>,
 }
 
-impl QuantifiedFormula
+impl<F> QuantifiedFormula<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
+	pub fn new(parameters: std::rc::Rc<VariableDeclarations<F>>, argument: Box<Formula<F>>) -> Self
 	{
 		Self
 		{
@@ -282,16 +311,21 @@ impl QuantifiedFormula
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Implies
+pub struct Implies<F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub direction: ImplicationDirection,
-	pub antecedent: Box<Formula>,
-	pub implication: Box<Formula>,
+	pub antecedent: Box<Formula<F>>,
+	pub implication: Box<Formula<F>>,
 }
 
-impl Implies
+impl<F> Implies<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(direction: ImplicationDirection, antecedent: Box<Formula>, implication: Box<Formula>)
+	pub fn new(direction: ImplicationDirection, antecedent: Box<Formula<F>>,
+		implication: Box<Formula<F>>)
 		-> Self
 	{
 		Self
@@ -304,17 +338,21 @@ impl Implies
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Predicate
+pub struct Predicate<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub declaration: std::rc::Rc<PredicateDeclaration>,
-	pub arguments: Terms,
+	pub declaration: std::rc::Rc<F::PredicateDeclaration>,
+	pub arguments: Terms<F>,
 }
 
-impl Predicate
+impl<F> Predicate<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Terms) -> Self
+	pub fn new(declaration: std::rc::Rc<F::PredicateDeclaration>, arguments: Terms<F>) -> Self
 	{
-		assert_eq!(declaration.arity, arguments.len(),
+		assert_eq!(declaration.arity(), arguments.len(),
 			"predicate has a different number of arguments then declared");
 
 		Self
@@ -328,33 +366,37 @@ impl Predicate
 // Variants
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Term
+pub enum Term<F>
+where
+	F: crate::flavor::Flavor,
 {
-	BinaryOperation(BinaryOperation),
+	BinaryOperation(BinaryOperation<F>),
 	Boolean(bool),
-	Function(Function),
+	Function(Function<F>),
 	Integer(i32),
 	SpecialInteger(SpecialInteger),
 	String(String),
-	UnaryOperation(UnaryOperation),
-	Variable(Variable),
+	UnaryOperation(UnaryOperation<F>),
+	Variable(Variable<F>),
 }
 
-pub type Terms = Vec<Term>;
+pub type Terms<F> = Vec<Term<F>>;
 
-impl Term
+impl<F> Term<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn absolute_value(argument: Box<Term>) -> Self
+	pub fn absolute_value(argument: Box<Term<F>>) -> Self
 	{
 		Self::unary_operation(UnaryOperator::AbsoluteValue, argument)
 	}
 
-	pub fn add(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn add(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Add, left, right)
 	}
 
-	pub fn binary_operation(operator: BinaryOperator, left: Box<Term>, right: Box<Term>) -> Self
+	pub fn binary_operation(operator: BinaryOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::BinaryOperation(BinaryOperation::new(operator, left, right))
 	}
@@ -364,12 +406,12 @@ impl Term
 		Self::Boolean(value)
 	}
 
-	pub fn divide(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn divide(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Divide, left, right)
 	}
 
-	pub fn exponentiate(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn exponentiate(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Exponentiate, left, right)
 	}
@@ -379,7 +421,7 @@ impl Term
 		Self::boolean(false)
 	}
 
-	pub fn function(declaration: std::rc::Rc<FunctionDeclaration>, arguments: Terms) -> Self
+	pub fn function(declaration: std::rc::Rc<F::FunctionDeclaration>, arguments: Terms<F>) -> Self
 	{
 		Self::Function(Function::new(declaration, arguments))
 	}
@@ -394,17 +436,17 @@ impl Term
 		Self::Integer(value)
 	}
 
-	pub fn modulo(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn modulo(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Modulo, left, right)
 	}
 
-	pub fn multiply(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn multiply(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Multiply, left, right)
 	}
 
-	pub fn negative(argument: Box<Term>) -> Self
+	pub fn negative(argument: Box<Term<F>>) -> Self
 	{
 		Self::unary_operation(UnaryOperator::Negative, argument)
 	}
@@ -419,7 +461,7 @@ impl Term
 		Self::String(value)
 	}
 
-	pub fn subtract(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn subtract(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::binary_operation(BinaryOperator::Subtract, left, right)
 	}
@@ -434,37 +476,41 @@ impl Term
 		Self::boolean(true)
 	}
 
-	pub fn unary_operation(operator: UnaryOperator, argument: Box<Term>) -> Self
+	pub fn unary_operation(operator: UnaryOperator, argument: Box<Term<F>>) -> Self
 	{
 		Self::UnaryOperation(UnaryOperation::new(operator, argument))
 	}
 
-	pub fn variable(declaration: std::rc::Rc<VariableDeclaration>) -> Self
+	pub fn variable(declaration: std::rc::Rc<F::VariableDeclaration>) -> Self
 	{
 		Self::Variable(Variable::new(declaration))
 	}
 }
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Formula
+pub enum Formula<F>
+where
+	F: crate::flavor::Flavor,
 {
-	And(Formulas),
+	And(Formulas<F>),
 	Boolean(bool),
-	Compare(Compare),
-	Exists(QuantifiedFormula),
-	ForAll(QuantifiedFormula),
-	IfAndOnlyIf(Formulas),
-	Implies(Implies),
-	Not(Box<Formula>),
-	Or(Formulas),
-	Predicate(Predicate),
+	Compare(Compare<F>),
+	Exists(QuantifiedFormula<F>),
+	ForAll(QuantifiedFormula<F>),
+	IfAndOnlyIf(Formulas<F>),
+	Implies(Implies<F>),
+	Not(Box<Formula<F>>),
+	Or(Formulas<F>),
+	Predicate(Predicate<F>),
 }
 
-pub type Formulas = Vec<Formula>;
+pub type Formulas<F> = Vec<Formula<F>>;
 
-impl Formula
+impl<F> Formula<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn and(arguments: Formulas) -> Self
+	pub fn and(arguments: Formulas<F>) -> Self
 	{
 		Self::And(arguments)
 	}
@@ -474,17 +520,17 @@ impl Formula
 		Self::Boolean(value)
 	}
 
-	pub fn compare(operator: ComparisonOperator, left: Box<Term>, right: Box<Term>) -> Self
+	pub fn compare(operator: ComparisonOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::Compare(Compare::new(operator, left, right))
 	}
 
-	pub fn exists(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
+	pub fn exists(parameters: std::rc::Rc<VariableDeclarations<F>>, argument: Box<Formula<F>>) -> Self
 	{
 		Self::Exists(QuantifiedFormula::new(parameters, argument))
 	}
 
-	pub fn equal(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn equal(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::Equal, left, right)
 	}
@@ -494,58 +540,58 @@ impl Formula
 		Self::boolean(false)
 	}
 
-	pub fn for_all(parameters: std::rc::Rc<VariableDeclarations>, argument: Box<Formula>) -> Self
+	pub fn for_all(parameters: std::rc::Rc<VariableDeclarations<F>>, argument: Box<Formula<F>>) -> Self
 	{
 		Self::ForAll(QuantifiedFormula::new(parameters, argument))
 	}
 
-	pub fn greater(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn greater(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::Greater, left, right)
 	}
 
-	pub fn greater_or_equal(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn greater_or_equal(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::GreaterOrEqual, left, right)
 	}
 
-	pub fn if_and_only_if(arguments: Formulas) -> Self
+	pub fn if_and_only_if(arguments: Formulas<F>) -> Self
 	{
 		Self::IfAndOnlyIf(arguments)
 	}
 
-	pub fn implies(direction: ImplicationDirection, antecedent: Box<Formula>,
-		consequent: Box<Formula>) -> Self
+	pub fn implies(direction: ImplicationDirection, antecedent: Box<Formula<F>>,
+		consequent: Box<Formula<F>>) -> Self
 	{
 		Self::Implies(Implies::new(direction, antecedent, consequent))
 	}
 
-	pub fn less(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn less(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::Less, left, right)
 	}
 
-	pub fn less_or_equal(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn less_or_equal(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::LessOrEqual, left, right)
 	}
 
-	pub fn not(argument: Box<Formula>) -> Self
+	pub fn not(argument: Box<Formula<F>>) -> Self
 	{
 		Self::Not(argument)
 	}
 
-	pub fn not_equal(left: Box<Term>, right: Box<Term>) -> Self
+	pub fn not_equal(left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
 		Self::compare(ComparisonOperator::NotEqual, left, right)
 	}
 
-	pub fn or(arguments: Formulas) -> Self
+	pub fn or(arguments: Formulas<F>) -> Self
 	{
 		Self::Or(arguments)
 	}
 
-	pub fn predicate(declaration: std::rc::Rc<PredicateDeclaration>, arguments: Terms) -> Self
+	pub fn predicate(declaration: std::rc::Rc<F::PredicateDeclaration>, arguments: Terms<F>) -> Self
 	{
 		Self::Predicate(Predicate::new(declaration, arguments))
 	}
@@ -556,8 +602,10 @@ impl Formula
 	}
 }
 
-pub struct OpenFormula
+pub struct OpenFormula<F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub free_variable_declarations: std::rc::Rc<VariableDeclarations>,
-	pub formula: Formula,
+	pub free_variable_declarations: std::rc::Rc<VariableDeclarations<F>>,
+	pub formula: Formula<F>,
 }

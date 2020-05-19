@@ -1,9 +1,11 @@
 use super::terms::*;
 use super::tokens::*;
 
-pub fn formula<D>(input: &str, declarations: &D) -> Result<crate::OpenFormula, crate::parse::Error>
+pub fn formula<D, F>(input: &str, declarations: &D)
+	-> Result<crate::OpenFormula<F>, crate::parse::Error>
 where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
+	F: crate::flavor::Flavor,
+	D: crate::FindOrCreateFunctionDeclaration<F> + crate::FindOrCreatePredicateDeclaration<F>,
 {
 	let variable_declaration_stack = crate::VariableDeclarationStackLayer::free();
 
@@ -69,19 +71,22 @@ impl std::fmt::Debug for LogicalConnective
 	}
 }
 
-struct FormulaStr<'i, 'd, 'p, 'v, D>
+struct FormulaStr<'i, 'd, 'p, 'v, F, D>
+where
+	F: crate::flavor::Flavor,
 {
 	input: &'i str,
 	declarations: &'d D,
-	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>,
+	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>,
 }
 
-impl<'i, 'd, 'p, 'v, D> FormulaStr<'i, 'd, 'p, 'v, D>
+impl<'i, 'd, 'p, 'v, F, D> FormulaStr<'i, 'd, 'p, 'v, F, D>
 where
-	D: crate::FindOrCreateFunctionDeclaration + crate::FindOrCreatePredicateDeclaration,
+	F: crate::flavor::Flavor,
+	D: crate::FindOrCreateFunctionDeclaration<F> + crate::FindOrCreatePredicateDeclaration<F>,
 {
 	pub fn new(input: &'i str, declarations: &'d D,
-		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p>)
+		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>)
 		-> Self
 	{
 		Self
@@ -189,7 +194,7 @@ where
 		Tokens::new_filter_map(self.input, functor)
 	}
 
-	pub fn parse(&self, level: usize) -> Result<crate::Formula, crate::parse::Error>
+	pub fn parse(&self, level: usize) -> Result<crate::Formula<F>, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
 		let input = trim_start(self.input);
@@ -395,7 +400,7 @@ where
 
 	// TODO: refactor
 	fn implication_left_to_right_inner<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<Option<crate::Formula>, crate::parse::Error>
+		-> Result<Option<crate::Formula<F>>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -418,7 +423,7 @@ where
 	}
 
 	fn implication_left_to_right<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<crate::Formula, crate::parse::Error>
+		-> Result<crate::Formula<F>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -446,9 +451,9 @@ where
 
 	// TODO: refactor without input argument
 	fn quantified_formula(&self, input: &str, quantifier: Quantifier, level: usize)
-		-> Result<crate::Formula, crate::parse::Error>
+		-> Result<crate::Formula<F>, crate::parse::Error>
 	{
-		let (parameters, input) = match variable_declarations(input)?
+		let (parameters, input) = match variable_declarations::<F>(input)?
 		{
 			Some(variable_declarations) => variable_declarations,
 			None => return Err(crate::parse::Error::new_expected_variable_declaration(
@@ -500,7 +505,7 @@ mod tests
 	#[test]
 	fn tokenize_formula_logical_connectives()
 	{
-		let declarations = crate::Declarations::new();
+		let declarations = crate::Declarations::<crate::flavor::DefaultFlavor>::new();
 		let variable_declaration_stack = crate::VariableDeclarationStackLayer::free();
 
 		let formula_str = |input| FormulaStr::new(input, &declarations,

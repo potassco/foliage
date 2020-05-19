@@ -1,25 +1,36 @@
-pub trait FindOrCreateFunctionDeclaration
+use crate::flavor::{FunctionDeclaration as _, PredicateDeclaration as _, VariableDeclaration as _};
+
+// Group with implementations
+pub trait FindOrCreateFunctionDeclaration<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<crate::FunctionDeclaration>;
+		-> std::rc::Rc<F::FunctionDeclaration>;
 }
 
-pub trait FindOrCreatePredicateDeclaration
+pub trait FindOrCreatePredicateDeclaration<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<crate::PredicateDeclaration>;
+		-> std::rc::Rc<F::PredicateDeclaration>;
 }
 
-pub struct BoundVariableDeclarations<'p>
+pub struct BoundVariableDeclarations<'p, F>
+where
+	F: crate::flavor::Flavor,
 {
-	parent: &'p VariableDeclarationStackLayer<'p>,
-	variable_declarations: std::rc::Rc<crate::VariableDeclarations>,
+	parent: &'p VariableDeclarationStackLayer<'p, F>,
+	variable_declarations: std::rc::Rc<crate::VariableDeclarations<F>>,
 }
 
-impl<'p> BoundVariableDeclarations<'p>
+impl<'p, F> BoundVariableDeclarations<'p, F>
+where
+	F: crate::flavor::Flavor,
 {
-	pub fn new(parent: &'p VariableDeclarationStackLayer<'p>,
-		variable_declarations: std::rc::Rc<crate::VariableDeclarations>) -> Self
+	pub fn new(parent: &'p VariableDeclarationStackLayer<'p, F>,
+		variable_declarations: std::rc::Rc<crate::VariableDeclarations<F>>) -> Self
 	{
 		Self
 		{
@@ -29,33 +40,37 @@ impl<'p> BoundVariableDeclarations<'p>
 	}
 }
 
-pub enum VariableDeclarationStackLayer<'p>
+pub enum VariableDeclarationStackLayer<'p, F>
+where
+	F: crate::flavor::Flavor,
 {
-	Free(std::cell::RefCell<crate::VariableDeclarations>),
-	Bound(BoundVariableDeclarations<'p>),
+	Free(std::cell::RefCell<crate::VariableDeclarations<F>>),
+	Bound(BoundVariableDeclarations<'p, F>),
 }
 
-impl<'p> VariableDeclarationStackLayer<'p>
+impl<'p, F> VariableDeclarationStackLayer<'p, F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub fn free() -> Self
 	{
 		Self::Free(std::cell::RefCell::new(vec![]))
 	}
 
-	pub fn bound(parent: &'p VariableDeclarationStackLayer<'p>,
-		variable_declarations: std::rc::Rc<crate::VariableDeclarations>) -> Self
+	pub fn bound(parent: &'p VariableDeclarationStackLayer<'p, F>,
+		variable_declarations: std::rc::Rc<crate::VariableDeclarations<F>>) -> Self
 	{
 		Self::Bound(BoundVariableDeclarations::new(parent, variable_declarations))
 	}
 
-	pub fn find(&self, variable_name: &str) -> Option<std::rc::Rc<crate::VariableDeclaration>>
+	pub fn find(&self, variable_name: &str) -> Option<std::rc::Rc<F::VariableDeclaration>>
 	{
 		match self
 		{
 			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
 				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
-					.find(|x| x.name == variable_name)
+					.find(|x| x.name() == variable_name)
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
 				}
@@ -66,7 +81,7 @@ impl<'p> VariableDeclarationStackLayer<'p>
 			{
 				if let Some(variable_declaration) = bound_variable_declarations
 					.variable_declarations.iter()
-					.find(|x| x.name == variable_name)
+					.find(|x| x.name() == variable_name)
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
 				}
@@ -76,22 +91,19 @@ impl<'p> VariableDeclarationStackLayer<'p>
 		}
 	}
 
-	pub fn find_or_create(&self, variable_name: &str) -> std::rc::Rc<crate::VariableDeclaration>
+	pub fn find_or_create(&self, variable_name: &str) -> std::rc::Rc<F::VariableDeclaration>
 	{
 		match self
 		{
 			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
 				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
-					.find(|x| x.name == variable_name)
+					.find(|x| x.name() == variable_name)
 				{
 					return std::rc::Rc::clone(&variable_declaration);
 				}
 
-				let variable_declaration = crate::VariableDeclaration
-				{
-					name: variable_name.to_owned(),
-				};
+				let variable_declaration = F::VariableDeclaration::new(variable_name.to_owned());
 				let variable_declaration = std::rc::Rc::new(variable_declaration);
 
 				free_variable_declarations.borrow_mut()
@@ -103,7 +115,7 @@ impl<'p> VariableDeclarationStackLayer<'p>
 			{
 				if let Some(variable_declaration) = bound_variable_declarations
 					.variable_declarations.iter()
-					.find(|x| x.name == variable_name)
+					.find(|x| x.name() == variable_name)
 				{
 					return std::rc::Rc::clone(&variable_declaration);
 				}
@@ -113,9 +125,9 @@ impl<'p> VariableDeclarationStackLayer<'p>
 		}
 	}
 
-	pub fn free_variable_declarations_do_mut<F, G>(&self, f: F) -> G
+	pub fn free_variable_declarations_do_mut<F1, F2>(&self, f: F1) -> F2
 	where
-		F: Fn(&mut crate::VariableDeclarations) -> G
+		F1: Fn(&mut crate::VariableDeclarations<F>) -> F2,
 	{
 		match self
 		{
@@ -126,9 +138,9 @@ impl<'p> VariableDeclarationStackLayer<'p>
 		}
 	}
 
-	pub fn free_variable_declarations_do<F, G>(&self, f: F) -> G
+	pub fn free_variable_declarations_do<F1, F2>(&self, f: F1) -> F2
 	where
-		F: Fn(&crate::VariableDeclarations) -> G
+		F1: Fn(&crate::VariableDeclarations<F>) -> F2,
 	{
 		match self
 		{
@@ -140,41 +152,44 @@ impl<'p> VariableDeclarationStackLayer<'p>
 	}
 }
 
-pub struct Declarations
+pub struct Declarations<F>
+where
+	F: crate::flavor::Flavor,
 {
-	function_declarations: std::cell::RefCell<crate::FunctionDeclarations>,
-	predicate_declarations: std::cell::RefCell<crate::PredicateDeclarations>,
+	function_declarations: std::cell::RefCell<crate::FunctionDeclarations<F>>,
+	predicate_declarations: std::cell::RefCell<crate::PredicateDeclarations<F>>,
 }
 
-impl Declarations
+impl<F> Declarations<F>
+where
+	F: crate::flavor::Flavor,
 {
 	pub fn new() -> Self
 	{
 		Self
 		{
-			function_declarations: std::cell::RefCell::new(crate::FunctionDeclarations::new()),
-			predicate_declarations: std::cell::RefCell::new(crate::PredicateDeclarations::new()),
+			function_declarations: std::cell::RefCell::new(crate::FunctionDeclarations::<F>::new()),
+			predicate_declarations:
+				std::cell::RefCell::new(crate::PredicateDeclarations::<F>::new()),
 		}
 	}
 }
 
-impl FindOrCreateFunctionDeclaration for Declarations
+impl<F> FindOrCreateFunctionDeclaration<F> for Declarations<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<crate::FunctionDeclaration>
+		-> std::rc::Rc<F::FunctionDeclaration>
 	{
 		let mut function_declarations = self.function_declarations.borrow_mut();
 
-		match function_declarations.iter().find(|x| x.name == name && x.arity == arity)
+		match function_declarations.iter().find(|x| x.name() == name && x.arity() == arity)
 		{
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>
 			{
-				let declaration = crate::FunctionDeclaration
-				{
-					name: name.to_string(),
-					arity,
-				};
+				let declaration = F::FunctionDeclaration::new(name.to_string(), arity);
 				let declaration = std::rc::Rc::new(declaration);
 
 				function_declarations.insert(std::rc::Rc::clone(&declaration));
@@ -185,23 +200,21 @@ impl FindOrCreateFunctionDeclaration for Declarations
 	}
 }
 
-impl FindOrCreatePredicateDeclaration for Declarations
+impl<F> FindOrCreatePredicateDeclaration<F> for Declarations<F>
+where
+	F: crate::flavor::Flavor,
 {
 	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<crate::PredicateDeclaration>
+		-> std::rc::Rc<F::PredicateDeclaration>
 	{
 		let mut predicate_declarations = self.predicate_declarations.borrow_mut();
 
-		match predicate_declarations.iter().find(|x| x.name == name && x.arity == arity)
+		match predicate_declarations.iter().find(|x| x.name() == name && x.arity() == arity)
 		{
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>
 			{
-				let declaration = crate::PredicateDeclaration
-				{
-					name: name.to_string(),
-					arity,
-				};
+				let declaration = F::PredicateDeclaration::new(name.to_string(), arity);
 				let declaration = std::rc::Rc::new(declaration);
 
 				predicate_declarations.insert(std::rc::Rc::clone(&declaration));
