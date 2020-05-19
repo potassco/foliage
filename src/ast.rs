@@ -94,10 +94,10 @@ pub struct VariableDeclaration
 impl std::cmp::PartialEq for VariableDeclaration
 {
 	#[inline(always)]
-	fn eq(&self, other: &VariableDeclaration) -> bool
+	fn eq(&self, other: &Self) -> bool
 	{
-		let l = self as *const VariableDeclaration;
-		let r = other as *const VariableDeclaration;
+		let l = self as *const Self;
+		let r = other as *const Self;
 
 		l.eq(&r)
 	}
