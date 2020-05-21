@@ -36,22 +36,6 @@ impl std::fmt::Display for crate::FunctionDeclaration
 	}
 }
 
-impl std::fmt::Debug for crate::VariableDeclaration
-{
-	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
-	{
-		write!(formatter, "{}", &self.name)
-	}
-}
-
-impl std::fmt::Display for crate::VariableDeclaration
-{
-	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
-	{
-		write!(formatter, "{:?}", &self)
-	}
-}
-
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum TermPosition
 {
