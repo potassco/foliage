@@ -1,4 +1,4 @@
-use crate::flavor::PredicateDeclaration as _;
+use crate::flavor::{PredicateDeclaration as _, VariableDeclaration as _};
 use super::terms::*;
 
 impl std::fmt::Debug for crate::ComparisonOperator
@@ -180,7 +180,8 @@ where
 
 					for parameter in exists.parameters.iter()
 					{
-						write!(formatter, "{}{}", separator, parameter)?;
+						write!(formatter, "{}", separator)?;
+						parameter.display_name(formatter)?;
 
 						separator = ", "
 					}
@@ -204,7 +205,8 @@ where
 
 					for parameter in for_all.parameters.iter()
 					{
-						write!(formatter, "{}{}", separator, parameter)?;
+						write!(formatter, "{}", separator)?;
+						parameter.display_name(formatter)?;
 
 						separator = ", "
 					}
@@ -341,7 +343,7 @@ where
 			crate::Formula::Boolean(false) => write!(formatter, "false")?,
 			crate::Formula::Predicate(predicate) =>
 			{
-				write!(formatter, "{}", predicate.declaration.name())?;
+				predicate.declaration.display_name(formatter)?;
 
 				if !predicate.arguments.is_empty()
 				{

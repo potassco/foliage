@@ -70,7 +70,7 @@ where
 			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
 				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
-					.find(|x| x.name() == variable_name)
+					.find(|x| x.matches_name(variable_name))
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
 				}
@@ -81,7 +81,7 @@ where
 			{
 				if let Some(variable_declaration) = bound_variable_declarations
 					.variable_declarations.iter()
-					.find(|x| x.name() == variable_name)
+					.find(|x| x.matches_name(variable_name))
 				{
 					return Some(std::rc::Rc::clone(&variable_declaration));
 				}
@@ -98,7 +98,7 @@ where
 			VariableDeclarationStackLayer::Free(free_variable_declarations) =>
 			{
 				if let Some(variable_declaration) = free_variable_declarations.borrow().iter()
-					.find(|x| x.name() == variable_name)
+					.find(|x| x.matches_name(variable_name))
 				{
 					return std::rc::Rc::clone(&variable_declaration);
 				}
@@ -115,7 +115,7 @@ where
 			{
 				if let Some(variable_declaration) = bound_variable_declarations
 					.variable_declarations.iter()
-					.find(|x| x.name() == variable_name)
+					.find(|x| x.matches_name(variable_name))
 				{
 					return std::rc::Rc::clone(&variable_declaration);
 				}
@@ -184,7 +184,7 @@ where
 	{
 		let mut function_declarations = self.function_declarations.borrow_mut();
 
-		match function_declarations.iter().find(|x| x.name() == name && x.arity() == arity)
+		match function_declarations.iter().find(|x| x.matches_signature(name, arity))
 		{
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>
@@ -209,7 +209,7 @@ where
 	{
 		let mut predicate_declarations = self.predicate_declarations.borrow_mut();
 
-		match predicate_declarations.iter().find(|x| x.name() == name && x.arity() == arity)
+		match predicate_declarations.iter().find(|x| x.matches_signature(name, arity))
 		{
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>

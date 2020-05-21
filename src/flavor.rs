@@ -2,8 +2,9 @@ pub trait FunctionDeclaration
 {
 	fn new(name: String, arity: usize) -> Self;
 
-	fn name(&self) -> &str;
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
 	fn arity(&self) -> usize;
+	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool;
 }
 
 impl FunctionDeclaration for crate::FunctionDeclaration
@@ -17,14 +18,19 @@ impl FunctionDeclaration for crate::FunctionDeclaration
 		}
 	}
 
-	fn name(&self) -> &str
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		&self.name
+		write!(formatter, "{}", self.name)
 	}
 
 	fn arity(&self) -> usize
 	{
 		self.arity
+	}
+
+	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool
+	{
+		self.name == other_name && self.arity == other_arity
 	}
 }
 
@@ -32,8 +38,9 @@ pub trait PredicateDeclaration
 {
 	fn new(name: String, arity: usize) -> Self;
 
-	fn name(&self) -> &str;
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
 	fn arity(&self) -> usize;
+	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool;
 }
 
 impl PredicateDeclaration for crate::PredicateDeclaration
@@ -47,14 +54,19 @@ impl PredicateDeclaration for crate::PredicateDeclaration
 		}
 	}
 
-	fn name(&self) -> &str
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		&self.name
+		write!(formatter, "{}", self.name)
 	}
 
 	fn arity(&self) -> usize
 	{
 		self.arity
+	}
+
+	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool
+	{
+		self.name == other_name && self.arity == other_arity
 	}
 }
 
@@ -62,7 +74,8 @@ pub trait VariableDeclaration
 {
 	fn new(name: String) -> Self;
 
-	fn name(&self) -> &str;
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
+	fn matches_name(&self, other_name: &str) -> bool;
 }
 
 impl VariableDeclaration for crate::VariableDeclaration
@@ -75,9 +88,14 @@ impl VariableDeclaration for crate::VariableDeclaration
 		}
 	}
 
-	fn name(&self) -> &str
+	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
-		&self.name
+		write!(formatter, "{}", self.name)
+	}
+
+	fn matches_name(&self, other_name: &str) -> bool
+	{
+		self.name == other_name
 	}
 }
 
@@ -86,8 +104,7 @@ pub trait Flavor
 	type FunctionDeclaration: FunctionDeclaration + std::cmp::Eq + std::cmp::Ord + std::hash::Hash;
 	type PredicateDeclaration:
 		PredicateDeclaration + std::cmp::Eq + std::cmp::Ord + std::hash::Hash;
-	type VariableDeclaration: VariableDeclaration + std::cmp::Eq + std::cmp::Ord + std::hash::Hash
-		+ std::fmt::Display;
+	type VariableDeclaration: VariableDeclaration + std::cmp::Eq + std::cmp::Ord + std::hash::Hash;
 }
 
 pub struct DefaultFlavor;

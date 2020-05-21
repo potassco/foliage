@@ -1,4 +1,4 @@
-use crate::flavor::FunctionDeclaration as _;
+use crate::flavor::{FunctionDeclaration as _, VariableDeclaration as _};
 
 impl std::fmt::Debug for crate::SpecialInteger
 {
@@ -190,10 +190,10 @@ where
 			crate::Term::Integer(value) => write!(formatter, "{}", value)?,
 			crate::Term::String(value) => write!(formatter, "\"{}\"",
 				value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t"))?,
-			crate::Term::Variable(variable) => write!(formatter, "{}", variable.declaration)?,
+			crate::Term::Variable(variable) => variable.declaration.display_name(formatter)?,
 			crate::Term::Function(function) =>
 			{
-				write!(formatter, "{}", function.declaration.name())?;
+				function.declaration.display_name(formatter)?;
 
 				assert!(function.declaration.arity() == function.arguments.len(),
 					"number of function arguments differs from declaration (expected {}, got {})",
