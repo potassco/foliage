@@ -11,17 +11,15 @@ pub trait Parser: Sized
 {
 	type Flavor: crate::flavor::Flavor;
 
-	fn new_function_declaration(name: String, arity: usize)
-		-> <Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration;
-	fn new_predicate_declaration(name: String, arity: usize)
-		-> <Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration;
+	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration>;
+
+	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
+		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration>;
+
 	fn new_variable_declaration(name: String)
 		-> <Self::Flavor as crate::flavor::Flavor>::VariableDeclaration;
 
-	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration>;
-	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration>;
 	fn find_or_create_variable_declaration(
 		variable_declaration_stack_layer: &crate::VariableDeclarationStackLayer<Self::Flavor>,
 		variable_name: &str)
@@ -93,26 +91,6 @@ impl Parser for DefaultParser
 {
 	type Flavor = crate::flavor::DefaultFlavor;
 
-	fn new_function_declaration(name: String, arity: usize)
-		-> <Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration
-	{
-		crate::FunctionDeclaration
-		{
-			name,
-			arity,
-		}
-	}
-
-	fn new_predicate_declaration(name: String, arity: usize)
-		-> <Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration
-	{
-		crate::PredicateDeclaration
-		{
-			name,
-			arity,
-		}
-	}
-
 	fn new_variable_declaration(name: String)
 		-> <Self::Flavor as crate::flavor::Flavor>::VariableDeclaration
 	{
@@ -132,7 +110,7 @@ impl Parser for DefaultParser
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>
 			{
-				let declaration = Self::new_function_declaration(name.to_string(), arity);
+				let declaration = crate::FunctionDeclaration::new(name.to_string(), arity);
 				let declaration = std::rc::Rc::new(declaration);
 
 				function_declarations.insert(std::rc::Rc::clone(&declaration));
@@ -152,7 +130,7 @@ impl Parser for DefaultParser
 			Some(declaration) => std::rc::Rc::clone(&declaration),
 			None =>
 			{
-				let declaration = Self::new_predicate_declaration(name.to_string(), arity);
+				let declaration = crate::PredicateDeclaration::new(name.to_string(), arity);
 				let declaration = std::rc::Rc::new(declaration);
 
 				predicate_declarations.insert(std::rc::Rc::clone(&declaration));
