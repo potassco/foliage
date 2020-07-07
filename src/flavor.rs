@@ -1,7 +1,5 @@
 pub trait FunctionDeclaration
 {
-	fn new(name: String, arity: usize) -> Self;
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
 	fn arity(&self) -> usize;
 	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool;
@@ -9,15 +7,6 @@ pub trait FunctionDeclaration
 
 impl FunctionDeclaration for crate::FunctionDeclaration
 {
-	fn new(name: String, arity: usize) -> Self
-	{
-		Self
-		{
-			name,
-			arity,
-		}
-	}
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
 		write!(formatter, "{}", self.name)
@@ -36,8 +25,6 @@ impl FunctionDeclaration for crate::FunctionDeclaration
 
 pub trait PredicateDeclaration
 {
-	fn new(name: String, arity: usize) -> Self;
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
 	fn arity(&self) -> usize;
 	fn matches_signature(&self, other_name: &str, other_arity: usize) -> bool;
@@ -45,15 +32,6 @@ pub trait PredicateDeclaration
 
 impl PredicateDeclaration for crate::PredicateDeclaration
 {
-	fn new(name: String, arity: usize) -> Self
-	{
-		Self
-		{
-			name,
-			arity,
-		}
-	}
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
 		write!(formatter, "{}", self.name)
@@ -72,22 +50,12 @@ impl PredicateDeclaration for crate::PredicateDeclaration
 
 pub trait VariableDeclaration
 {
-	fn new(name: String) -> Self;
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result;
 	fn matches_name(&self, other_name: &str) -> bool;
 }
 
 impl VariableDeclaration for crate::VariableDeclaration
 {
-	fn new(name: String) -> Self
-	{
-		Self
-		{
-			name
-		}
-	}
-
 	fn display_name(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
 		write!(formatter, "{}", self.name)

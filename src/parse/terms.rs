@@ -1,4 +1,3 @@
-use crate::flavor::VariableDeclaration as _;
 use super::tokens::*;
 
 pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
@@ -83,23 +82,25 @@ fn is_variable_name(identifier: &str) -> bool
 	false
 }
 
-pub(crate) fn variable_declaration<F>(input: &str) -> Option<(F::VariableDeclaration, &str)>
+pub(crate) fn variable_declaration<P>(input: &str)
+	-> Option<(<P::Flavor as crate::flavor::Flavor>::VariableDeclaration, &str)>
 where
-	F: crate::flavor::Flavor,
+	P: crate::parse::Parser,
 {
 	variable_name(input)
 		.map(|(variable_name, remaining_input)|
-			(F::VariableDeclaration::new(variable_name.to_string()), remaining_input))
+			(<P as crate::parse::Parser>::new_variable_declaration(variable_name.to_string()),
+			remaining_input))
 }
 
-pub(crate) fn variable_declarations<F>(input: &str)
-	-> Result<Option<(crate::VariableDeclarations<F>, &str)>, crate::parse::Error>
+pub(crate) fn variable_declarations<P>(input: &str)
+	-> Result<Option<(crate::VariableDeclarations<P::Flavor>, &str)>, crate::parse::Error>
 where
-	F: crate::flavor::Flavor,
+	P: crate::parse::Parser,
 {
 	let mut variable_declarations = vec![];
 
-	let (first_variable_declaration, mut input) = match variable_declaration::<F>(input)
+	let (first_variable_declaration, mut input) = match variable_declaration::<P>(input)
 	{
 		Some(first_variable_declaration) => first_variable_declaration,
 		None => return Ok(None),
@@ -120,7 +121,7 @@ where
 
 		input = trim_start(input);
 
-		let (variable_declaration, remaining_input) = match variable_declaration::<F>(input)
+		let (variable_declaration, remaining_input) = match variable_declaration::<P>(input)
 		{
 			Some(variable_declaration) => variable_declaration,
 			None => return Err(crate::parse::Error::new_expected_variable_declaration(
@@ -167,28 +168,27 @@ impl std::fmt::Debug for ArithmeticOperatorClass
 	}
 }
 
-pub(crate) struct TermStr<'i, 'd, 'v, 'p, F, D>
+pub(crate) struct TermStr<'i, 'd, 'v, 'p, P>
 where
-	F: crate::flavor::Flavor,
+	P: super::Parser,
 {
 	input: &'i str,
-	declarations: &'d D,
-	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>,
+	parser: &'d P,
+	variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, P::Flavor>,
 }
 
-impl<'i, 'd, 'v, 'p, F, D> TermStr<'i, 'd, 'v, 'p, F, D>
+impl<'i, 'd, 'v, 'p, P> TermStr<'i, 'd, 'v, 'p, P>
 where
-	F: crate::flavor::Flavor,
-	D: crate::FindOrCreateFunctionDeclaration<F> + crate::FindOrCreatePredicateDeclaration<F>,
+	P: super::Parser,
 {
-	pub fn new(input: &'i str, declarations: &'d D,
-		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, F>)
+	pub fn new(input: &'i str, parser: &'d P,
+		variable_declaration_stack: &'v crate::VariableDeclarationStackLayer<'p, P::Flavor>)
 		-> Self
 	{
 		Self
 		{
 			input,
-			declarations,
+			parser,
 			variable_declaration_stack,
 		}
 	}
@@ -307,7 +307,7 @@ where
 		Ok(top_level_arithmetic_operator_class)
 	}
 
-	pub fn parse(&self, level: usize) -> Result<crate::Term<F>, crate::parse::Error>
+	pub fn parse(&self, level: usize) -> Result<crate::Term<P::Flavor>, crate::parse::Error>
 	{
 		let indentation = "  ".repeat(level);
 		log::trace!("{}- parsing term: {}", indentation, self.input);
@@ -347,7 +347,7 @@ where
 				crate::parse::Error::new_expected_term(
 					crate::parse::error::Location::new(0, Some(0))))??;
 			let first_argument =
-				TermStr::new(first_argument, self.declarations, self.variable_declaration_stack)
+				TermStr::new(first_argument, self.parser, self.variable_declaration_stack)
 					.parse(level + 1)?;
 			// TODO: improve error handling if the terms between the operators are invalid
 
@@ -356,7 +356,7 @@ where
 					|(accumulator, binary_operator), argument|
 					{
 						let (argument, next_binary_operator) = argument?;
-						let argument = TermStr::new(argument, self.declarations,
+						let argument = TermStr::new(argument, self.parser,
 							self.variable_declaration_stack)
 								.parse(level + 1)?;
 						let binary_operation =
@@ -370,7 +370,7 @@ where
 			// The last item hasn’t been consumed yet, so it’s safe to unwrap it
 			let last_argument = argument_iterator.remaining_input().unwrap();
 			let last_argument =
-				TermStr::new(last_argument, self.declarations, self.variable_declaration_stack)
+				TermStr::new(last_argument, self.parser, self.variable_declaration_stack)
 					.parse(level + 1)?;
 			let last_binary_operation =
 				crate::BinaryOperation::new(last_binary_operator, Box::new(accumulator),
@@ -442,7 +442,8 @@ where
 							crate::parse::error::Location::new(0, Some(0))))
 					}
 
-					let declaration = self.variable_declaration_stack.find_or_create(identifier);
+					let declaration = P::find_or_create_variable_declaration(
+						self.variable_declaration_stack, identifier);
 					return Ok(crate::Term::variable(declaration));
 				},
 				_ if is_function_name(identifier) =>
@@ -459,7 +460,7 @@ where
 						{
 							let functor = |token: &_| *token == Token::Symbol(Symbol::Comma);
 							let arguments = Tokens::new_filter(parenthesized_expression, functor).split()
-								.map(|argument| TermStr::new(argument?, self.declarations,
+								.map(|argument| TermStr::new(argument?, self.parser,
 									self.variable_declaration_stack)
 										.parse(level + 1))
 								.collect::<Result<_, _>>()?;
@@ -475,7 +476,7 @@ where
 							crate::parse::error::Location::new(0, Some(0))))
 					}
 
-					let declaration = self.declarations.find_or_create_function_declaration(
+					let declaration = self.parser.find_or_create_function_declaration(
 						function_name, arguments.len());
 					return Ok(crate::Term::function(declaration, arguments));
 				},
@@ -494,7 +495,7 @@ where
 					crate::parse::error::Location::new(0, Some(0))));
 			}
 
-			return TermStr::new(parenthesized_expression, self.declarations,
+			return TermStr::new(parenthesized_expression, self.parser,
 				self.variable_declaration_stack)
 					.parse(level + 1);
 		}
@@ -505,7 +506,7 @@ where
 
 	// TODO: refactor
 	fn exponentiate_inner<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<Option<crate::Term<F>>, crate::parse::Error>
+		-> Result<Option<crate::Term<P::Flavor>>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -515,7 +516,7 @@ where
 			{
 				// TODO: improve error handling if antecedent cannot be parsed
 				let argument =
-					TermStr::new(argument?, self.declarations, self.variable_declaration_stack)
+					TermStr::new(argument?, self.parser, self.variable_declaration_stack)
 						.parse(level)?;
 				match self.exponentiate_inner(argument_iterator, level)?
 				{
@@ -529,7 +530,7 @@ where
 	}
 
 	fn exponentiate<T>(&self, mut argument_iterator: T, level: usize)
-		-> Result<crate::Term<F>, crate::parse::Error>
+		-> Result<crate::Term<P::Flavor>, crate::parse::Error>
 	where
 		T: std::iter::Iterator<Item = Result<&'i str, crate::parse::Error>>
 	{
@@ -539,7 +540,7 @@ where
 			{
 				// TODO: improve error handling if antecedent cannot be parsed
 				let argument =
-					TermStr::new(argument?, self.declarations, self.variable_declaration_stack)
+					TermStr::new(argument?, self.parser, self.variable_declaration_stack)
 						.parse(level)?;
 				match self.exponentiate_inner(argument_iterator, level)?
 				{
@@ -581,7 +582,7 @@ mod tests
 	fn parse_variable_declaration()
 	{
 		let variable_declaration =
-			|x| super::variable_declaration::<crate::flavor::DefaultFlavor>(x);
+			|x| super::variable_declaration::<crate::parse::DefaultParser>(x);
 
 		let v = variable_declaration("X").unwrap();
 		assert_eq!((v.0.name.as_str(), v.1), ("X", ""));
@@ -613,7 +614,7 @@ mod tests
 	fn parse_variable_declarations()
 	{
 		let variable_declarations =
-			|x| super::variable_declarations::<crate::flavor::DefaultFlavor>(x);
+			|x| super::variable_declarations::<crate::parse::DefaultParser>(x);
 
 		let v = variable_declarations("X.").unwrap().unwrap();
 		assert_eq!(v.0.len(), 1);

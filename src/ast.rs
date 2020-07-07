@@ -199,7 +199,7 @@ where
 	pub fn new(declaration: std::rc::Rc<F::FunctionDeclaration>, arguments: Terms<F>) -> Self
 	{
 		assert_eq!(declaration.arity(), arguments.len(),
-			"function has a different number of arguments then declared");
+			"function has a different number of arguments than declared");
 
 		Self
 		{
@@ -353,7 +353,7 @@ where
 	pub fn new(declaration: std::rc::Rc<F::PredicateDeclaration>, arguments: Terms<F>) -> Self
 	{
 		assert_eq!(declaration.arity(), arguments.len(),
-			"predicate has a different number of arguments then declared");
+			"predicate has a different number of arguments than declared");
 
 		Self
 		{
