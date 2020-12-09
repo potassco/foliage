@@ -197,58 +197,40 @@ where
 		let functor = move |token| match token
 		{
 			Token::Symbol(Symbol::Exponentiation) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Exponential
+				match arithmetic_operator_class == ArithmeticOperatorClass::Exponential
 				{
-					Some(crate::BinaryOperator::Exponentiate)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Exponentiate),
+					false => None,
 				},
 			Token::Symbol(Symbol::Multiplication) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
+				match arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
 				{
-					Some(crate::BinaryOperator::Multiply)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Multiply),
+					false => None,
 				},
 			Token::Symbol(Symbol::Division) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
+				match arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
 				{
-					Some(crate::BinaryOperator::Divide)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Divide),
+					false => None,
 				},
 			Token::Symbol(Symbol::Percent) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
+				match arithmetic_operator_class == ArithmeticOperatorClass::Multiplicative
 				{
-					Some(crate::BinaryOperator::Modulo)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Modulo),
+					false => None,
 				},
 			Token::Symbol(Symbol::Plus) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Additive
+				match arithmetic_operator_class == ArithmeticOperatorClass::Additive
 				{
-					Some(crate::BinaryOperator::Add)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Add),
+					false => None,
 				},
 			Token::Symbol(Symbol::Minus) =>
-				if arithmetic_operator_class == ArithmeticOperatorClass::Additive
+				match arithmetic_operator_class == ArithmeticOperatorClass::Additive
 				{
-					Some(crate::BinaryOperator::Subtract)
-				}
-				else
-				{
-					None
+					true => Some(crate::BinaryOperator::Subtract),
+					false => None,
 				},
 			_ => None,
 		};
