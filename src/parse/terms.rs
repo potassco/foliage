@@ -1,48 +1,5 @@
 use super::tokens::*;
 
-pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
-{
-	let (identifier, remaining_input) = identifier(input)?;
-
-	if is_keyword(identifier)
-	{
-		return None;
-	}
-
-	let mut characters = identifier.chars();
-
-	while let Some(character) = characters.next()
-	{
-		match character
-		{
-			'_' => continue,
-			_ if character.is_ascii_lowercase() => return Some((identifier, remaining_input)),
-			_ => return None,
-		}
-	}
-
-	None
-}
-
-fn variable_name(input: &str) -> Option<(&str, &str)>
-{
-	let (identifier, remaining_input) = identifier(input)?;
-
-	let mut characters = identifier.chars();
-
-	while let Some(character) = characters.next()
-	{
-		match character
-		{
-			'_' => continue,
-			_ if character.is_ascii_uppercase() => return Some((identifier, remaining_input)),
-			_ => return None,
-		}
-	}
-
-	None
-}
-
 pub fn is_function_name(identifier: &str) -> bool
 {
 	if is_keyword(identifier)
@@ -65,6 +22,17 @@ pub fn is_function_name(identifier: &str) -> bool
 	false
 }
 
+pub(crate) fn function_name(input: &str) -> Option<(&str, &str)>
+{
+	let (identifier, remaining_input) = identifier(input)?;
+
+	match is_function_name(identifier)
+	{
+		true => Some((identifier, remaining_input)),
+		false => None,
+	}
+}
+
 fn is_variable_name(identifier: &str) -> bool
 {
 	let mut characters = identifier.chars();
@@ -80,6 +48,17 @@ fn is_variable_name(identifier: &str) -> bool
 	}
 
 	false
+}
+
+fn variable_name(input: &str) -> Option<(&str, &str)>
+{
+	let (identifier, remaining_input) = identifier(input)?;
+
+	match is_variable_name(identifier)
+	{
+		true => Some((identifier, remaining_input)),
+		false => None,
+	}
 }
 
 pub(crate) fn variable_declaration<P>(input: &str)
