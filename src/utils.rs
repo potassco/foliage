@@ -2,7 +2,7 @@ use crate::flavor::VariableDeclaration as _;
 
 pub struct BoundVariableDeclarations<'p, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub parent: &'p VariableDeclarationStackLayer<'p, F>,
 	pub variable_declarations: std::rc::Rc<crate::VariableDeclarations<F>>,
@@ -10,7 +10,7 @@ where
 
 impl<'p, F> BoundVariableDeclarations<'p, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(parent: &'p VariableDeclarationStackLayer<'p, F>,
 		variable_declarations: std::rc::Rc<crate::VariableDeclarations<F>>) -> Self
@@ -25,7 +25,7 @@ where
 
 pub enum VariableDeclarationStackLayer<'p, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	Free(std::cell::RefCell<crate::VariableDeclarations<F>>),
 	Bound(BoundVariableDeclarations<'p, F>),
@@ -33,7 +33,7 @@ where
 
 impl<'p, F> VariableDeclarationStackLayer<'p, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn free() -> Self
 	{

@@ -9,21 +9,21 @@ use crate::flavor::{FunctionDeclaration as _, PredicateDeclaration as _, Variabl
 
 pub trait Parser: Sized
 {
-	type Flavor: crate::flavor::Flavor;
+	type Flavor: crate::Flavor;
 
 	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration>;
+		-> std::rc::Rc<<Self::Flavor as crate::Flavor>::FunctionDeclaration>;
 
 	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration>;
+		-> std::rc::Rc<<Self::Flavor as crate::Flavor>::PredicateDeclaration>;
 
 	fn new_variable_declaration(name: String)
-		-> <Self::Flavor as crate::flavor::Flavor>::VariableDeclaration;
+		-> <Self::Flavor as crate::Flavor>::VariableDeclaration;
 
 	fn find_or_create_variable_declaration(
 		variable_declaration_stack_layer: &crate::VariableDeclarationStackLayer<Self::Flavor>,
 		variable_name: &str)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::VariableDeclaration>
+		-> std::rc::Rc<<Self::Flavor as crate::Flavor>::VariableDeclaration>
 	{
 		match variable_declaration_stack_layer
 		{
@@ -89,10 +89,10 @@ impl DefaultParser
 
 impl Parser for DefaultParser
 {
-	type Flavor = crate::flavor::DefaultFlavor;
+	type Flavor = crate::DefaultFlavor;
 
 	fn new_variable_declaration(name: String)
-		-> <Self::Flavor as crate::flavor::Flavor>::VariableDeclaration
+		-> <Self::Flavor as crate::Flavor>::VariableDeclaration
 	{
 		crate::VariableDeclaration
 		{
@@ -101,7 +101,7 @@ impl Parser for DefaultParser
 	}
 
 	fn find_or_create_function_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::FunctionDeclaration>
+		-> std::rc::Rc<<Self::Flavor as crate::Flavor>::FunctionDeclaration>
 	{
 		let mut function_declarations = self.function_declarations.borrow_mut();
 
@@ -121,7 +121,7 @@ impl Parser for DefaultParser
 	}
 
 	fn find_or_create_predicate_declaration(&self, name: &str, arity: usize)
-		-> std::rc::Rc<<Self::Flavor as crate::flavor::Flavor>::PredicateDeclaration>
+		-> std::rc::Rc<<Self::Flavor as crate::Flavor>::PredicateDeclaration>
 	{
 		let mut predicate_declarations = self.predicate_declarations.borrow_mut();
 

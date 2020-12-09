@@ -46,7 +46,7 @@ pub(crate) enum TermPosition
 
 pub struct TermDisplay<'term, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	term: &'term crate::Term<F>,
 	parent_term: Option<&'term crate::Term<F>>,
@@ -55,7 +55,7 @@ where
 
 impl<'term, F> TermDisplay<'term, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn requires_parentheses(&self) -> bool
 	{
@@ -143,7 +143,7 @@ pub(crate) fn display_term<'term, F>(term: &'term crate::Term<F>,
 	parent_term: Option<&'term crate::Term<F>>, position: TermPosition)
 	-> TermDisplay<'term, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	TermDisplay
 	{
@@ -155,7 +155,7 @@ where
 
 impl<'term, F> std::fmt::Debug for TermDisplay<'term, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -238,7 +238,7 @@ where
 
 impl<'term, F> std::fmt::Display for TermDisplay<'term, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -248,7 +248,7 @@ where
 
 impl<F> std::fmt::Debug for crate::Term<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -258,7 +258,7 @@ where
 
 impl<F> std::fmt::Display for crate::Term<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -270,7 +270,7 @@ where
 pub(crate) mod tests
 {
 	use crate::*;
-	type Term = crate::Term<flavor::DefaultFlavor>;
+	type Term = crate::Term<DefaultFlavor>;
 
 	macro_rules! assert
 	{

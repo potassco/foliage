@@ -56,7 +56,7 @@ pub(crate) enum FormulaPosition
 
 pub struct FormulaDisplay<'formula, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	formula: &'formula crate::Formula<F>,
 	parent_formula: Option<&'formula crate::Formula<F>>,
@@ -66,7 +66,7 @@ where
 
 impl<'formula, F> FormulaDisplay<'formula, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn requires_parentheses(&self) -> bool
 	{
@@ -140,7 +140,7 @@ pub(crate) fn display_formula<'formula, F>(formula: &'formula crate::Formula<F>,
 	parent_formula: Option<&'formula crate::Formula<F>>, position: FormulaPosition)
 	-> FormulaDisplay<'formula, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	FormulaDisplay
 	{
@@ -152,7 +152,7 @@ where
 
 impl<'formula, F> std::fmt::Debug for FormulaDisplay<'formula, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -375,7 +375,7 @@ where
 
 impl<'formula, F> std::fmt::Display for FormulaDisplay<'formula, F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -385,7 +385,7 @@ where
 
 impl<F> std::fmt::Debug for crate::Formula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -395,7 +395,7 @@ where
 
 impl<F> std::fmt::Display for crate::Formula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result
 	{
@@ -408,9 +408,9 @@ mod tests
 {
 	use crate::*;
 	use format::terms::tests::*;
-	type Formula = crate::Formula<flavor::DefaultFlavor>;
-	type Term = crate::Term<flavor::DefaultFlavor>;
-	type VariableDeclarations = crate::VariableDeclarations<flavor::DefaultFlavor>;
+	type Formula = crate::Formula<DefaultFlavor>;
+	type Term = crate::Term<DefaultFlavor>;
+	type VariableDeclarations = crate::VariableDeclarations<DefaultFlavor>;
 
 	macro_rules! assert
 	{

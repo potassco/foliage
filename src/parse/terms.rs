@@ -83,7 +83,7 @@ fn is_variable_name(identifier: &str) -> bool
 }
 
 pub(crate) fn variable_declaration<P>(input: &str)
-	-> Option<(<P::Flavor as crate::flavor::Flavor>::VariableDeclaration, &str)>
+	-> Option<(<P::Flavor as crate::Flavor>::VariableDeclaration, &str)>
 where
 	P: crate::parse::Parser,
 {

@@ -62,7 +62,7 @@ impl FunctionDeclaration
 }
 
 pub type FunctionDeclarations<F> =
-	std::collections::BTreeSet<std::rc::Rc<<F as crate::flavor::Flavor>::FunctionDeclaration>>;
+	std::collections::BTreeSet<std::rc::Rc<<F as crate::Flavor>::FunctionDeclaration>>;
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PredicateDeclaration
@@ -84,7 +84,7 @@ impl PredicateDeclaration
 }
 
 pub type PredicateDeclarations<F> =
-	std::collections::BTreeSet<std::rc::Rc<<F as crate::flavor::Flavor>::PredicateDeclaration>>;
+	std::collections::BTreeSet<std::rc::Rc<<F as crate::Flavor>::PredicateDeclaration>>;
 
 pub struct VariableDeclaration
 {
@@ -153,15 +153,14 @@ impl VariableDeclaration
 	}
 }
 
-pub type VariableDeclarations<F> =
-	Vec<std::rc::Rc<<F as crate::flavor::Flavor>::VariableDeclaration>>;
+pub type VariableDeclarations<F> = Vec<std::rc::Rc<<F as crate::Flavor>::VariableDeclaration>>;
 
 // Terms
 
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct BinaryOperation<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub operator: BinaryOperator,
 	pub left: Box<Term<F>>,
@@ -170,7 +169,7 @@ where
 
 impl<F> BinaryOperation<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(operator: BinaryOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
@@ -186,7 +185,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Function<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub declaration: std::rc::Rc<F::FunctionDeclaration>,
 	pub arguments: Terms<F>,
@@ -194,7 +193,7 @@ where
 
 impl<F> Function<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(declaration: std::rc::Rc<F::FunctionDeclaration>, arguments: Terms<F>) -> Self
 	{
@@ -219,7 +218,7 @@ pub enum SpecialInteger
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct UnaryOperation<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub operator: UnaryOperator,
 	pub argument: Box<Term<F>>,
@@ -227,7 +226,7 @@ where
 
 impl<F> UnaryOperation<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(operator: UnaryOperator, argument: Box<Term<F>>) -> Self
 	{
@@ -242,14 +241,14 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Variable<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub declaration: std::rc::Rc<F::VariableDeclaration>,
 }
 
 impl<F> Variable<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(declaration: std::rc::Rc<F::VariableDeclaration>) -> Self
 	{
@@ -265,7 +264,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Compare<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub operator: ComparisonOperator,
 	pub left: Box<Term<F>>,
@@ -274,7 +273,7 @@ where
 
 impl<F> Compare<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(operator: ComparisonOperator, left: Box<Term<F>>, right: Box<Term<F>>) -> Self
 	{
@@ -290,7 +289,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct QuantifiedFormula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub parameters: std::rc::Rc<VariableDeclarations<F>>,
 	pub argument: Box<Formula<F>>,
@@ -298,7 +297,7 @@ where
 
 impl<F> QuantifiedFormula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(parameters: std::rc::Rc<VariableDeclarations<F>>, argument: Box<Formula<F>>) -> Self
 	{
@@ -313,7 +312,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Implies<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub direction: ImplicationDirection,
 	pub antecedent: Box<Formula<F>>,
@@ -322,7 +321,7 @@ where
 
 impl<F> Implies<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(direction: ImplicationDirection, antecedent: Box<Formula<F>>,
 		implication: Box<Formula<F>>)
@@ -340,7 +339,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Predicate<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub declaration: std::rc::Rc<F::PredicateDeclaration>,
 	pub arguments: Terms<F>,
@@ -348,7 +347,7 @@ where
 
 impl<F> Predicate<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn new(declaration: std::rc::Rc<F::PredicateDeclaration>, arguments: Terms<F>) -> Self
 	{
@@ -368,7 +367,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Term<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	BinaryOperation(BinaryOperation<F>),
 	Boolean(bool),
@@ -384,7 +383,7 @@ pub type Terms<F> = Vec<Term<F>>;
 
 impl<F> Term<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn absolute_value(argument: Box<Term<F>>) -> Self
 	{
@@ -490,7 +489,7 @@ where
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Formula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	And(Formulas<F>),
 	Boolean(bool),
@@ -508,7 +507,7 @@ pub type Formulas<F> = Vec<Formula<F>>;
 
 impl<F> Formula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub fn and(arguments: Formulas<F>) -> Self
 	{
@@ -604,7 +603,7 @@ where
 
 pub struct OpenFormula<F>
 where
-	F: crate::flavor::Flavor,
+	F: crate::Flavor,
 {
 	pub free_variable_declarations: std::rc::Rc<VariableDeclarations<F>>,
 	pub formula: Formula<F>,
