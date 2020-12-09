@@ -68,8 +68,7 @@ where
 {
 	variable_name(input)
 		.map(|(variable_name, remaining_input)|
-			(<P as crate::parse::Parser>::new_variable_declaration(variable_name.to_string()),
-			remaining_input))
+			(P::new_variable_declaration(variable_name.to_string()), remaining_input))
 }
 
 pub(crate) fn variable_declarations<P>(input: &str)
