@@ -258,7 +258,6 @@ pub(crate) fn symbol(input: &str) -> Option<(Symbol, &str)>
 	match character
 	{
 		',' => Some((Symbol::Comma, remaining_input)),
-		// <->, <-, <=, <
 		'=' => Some((Symbol::Equal, remaining_input)),
 		// !=
 		'!' => match characters.next()
@@ -266,6 +265,7 @@ pub(crate) fn symbol(input: &str) -> Option<(Symbol, &str)>
 			Some((_, '=')) => Some((Symbol::NotEqual, characters.as_str())),
 			_ => None,
 		},
+		// <->, <-, <=, <
 		'<' => match characters.next()
 		{
 			Some((_, '-')) =>
