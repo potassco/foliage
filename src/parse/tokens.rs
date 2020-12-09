@@ -72,6 +72,28 @@ impl std::fmt::Debug for Keyword
 	}
 }
 
+impl std::convert::TryFrom<&str> for Keyword
+{
+	type Error = ();
+
+	fn try_from(input: &str) -> Result<Self, Self::Error>
+	{
+		match input
+		{
+			"and" => Ok(Self::And),
+			"exists" => Ok(Self::Exists),
+			"false" => Ok(Self::False),
+			"forall" => Ok(Self::ForAll),
+			"inf" => Ok(Self::Infimum),
+			"not" => Ok(Self::Not),
+			"or" => Ok(Self::Or),
+			"sup" => Ok(Self::Supremum),
+			"true" => Ok(Self::True),
+			_ => Err(()),
+		}
+	}
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Symbol
 {
@@ -125,6 +147,7 @@ impl std::fmt::Debug for Symbol
 pub(crate) enum Token<'i>
 {
 	Identifier(&'i str),
+	//Keyword(Keyword),
 	Number(usize),
 	ParenthesizedExpression(&'i str),
 	Symbol(Symbol),
@@ -182,19 +205,9 @@ pub fn identifier(input: &str) -> Option<(&str, &str)>
 
 pub(crate) fn is_keyword(identifier: &str) -> bool
 {
-	match identifier
-	{
-		"and"
-		| "exists"
-		| "false"
-		| "forall"
-		| "inf"
-		| "not"
-		| "or"
-		| "sup"
-		| "true" => true,
-		_ => false,
-	}
+	use std::convert::TryFrom;
+
+	Keyword::try_from(identifier).is_ok()
 }
 
 fn number_string(input: &str) -> Option<(&str, &str)>
